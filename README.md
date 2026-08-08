@@ -4,6 +4,10 @@
 
 TürKod IDE, kodlamaya yeni başlayan öğrenciler için tasarlanmış tamamen Türkçe komutlarla çalışan, sade arayüzlü ve yapay zeka asistanı destekli bir geliştirme ortamıdır.
 
+💡 Amacım Eğitim Amaçlıdır:
+
+TürKod IDE, özellikle yazılıma yeni adım atan öğrencilerin ve gençlerin kodlama mantığını kendi ana dillerinde, gözleri korkmadan kavramalarını kolaylaştırmak amacıyla tamamen eğitim odaklı geliştirilmiştir.
+
 ## 🚀 Özellikler
 - **Tamamen Türkçe Sözlük & Komut Yapısı:** Kodlama terimlerini Türkçe olarak öğrenin.
 - **Sade ve Kullanıcı Dostu Arayüz:** Karmaşık menülerden uzak, öğrenci odaklı tasarım.
