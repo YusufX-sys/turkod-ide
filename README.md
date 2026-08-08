@@ -10,7 +10,7 @@ TürKod IDE, kodlamaya yeni başlayan öğrenciler için tasarlanmış tamamen T
 
 💡 Amacım Eğitim Amaçlıdır:
 
-TürKod IDE, özellikle yazılıma yeni adım atan öğrencilerin ve gençlerin kodlama mantığını kendi ana dillerinde, gözleri korkmadan kavramalarını kolaylaştırmak amacıyla tamamen eğitim odaklı geliştirilmiştir.
+TürKod IDE, özellikle yazılıma yeni adım atan öğrencilerin ve gençlerin kodlama mantığını kendi ana dillerinde, gözleri korkmadan kavramalarını kolaylaştırmak amacıyla tamamen eğitim odaklı geliştirilmiştir.Bu yazılım tamamen eğitim ve deneysel amaçlarla geliştirilmiştir. Yazılımın kullanımından, doğrudan veya dolaylı olarak doğabilecek herhangi bir veri kaybı, sistem hatası veya güvenlik sorunundan geliştirici (Yusuf Tandoğan) sorumlu tutulamaz. Kullanıcılar yazılımı kendi sorumluluklarında çalıştırırlar.
 
 ## 🚀 Özellikler
 - **Tamamen Türkçe Sözlük & Komut Yapısı:** Kodlama terimlerini Türkçe olarak öğrenin.
