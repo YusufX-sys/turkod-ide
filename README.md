@@ -1,3 +1,5 @@
+<img width="1280" height="720" alt="TürKod" src="https://github.com/user-attachments/assets/46423c98-91c9-4938-b595-e232cb6819ea" />
+
 # 🇹🇷 TürKod IDE
 
 TürKod IDE, kodlamaya yeni başlayan öğrenciler için tasarlanmış tamamen Türkçe komutlarla çalışan, sade arayüzlü ve yapay zeka asistanı destekli bir geliştirme ortamıdır.
