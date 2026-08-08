@@ -1,0 +1,25 @@
+# 🇹🇷 TürKod IDE
+
+TürKod IDE, kodlamaya yeni başlayan öğrenciler için tasarlanmış tamamen Türkçe komutlarla çalışan, sade arayüzlü ve yapay zeka asistanı destekli bir geliştirme ortamıdır.
+
+## 🚀 Özellikler
+- **Tamamen Türkçe Sözlük & Komut Yapısı:** Kodlama terimlerini Türkçe olarak öğrenin.
+- **Sade ve Kullanıcı Dostu Arayüz:** Karmaşık menülerden uzak, öğrenci odaklı tasarım.
+- **Yapay Zeka Asistanı:** TürKod sözlüğüne tam erişimi olan ve kod yazmaya yardımcı olan dahili AI.
+- **RSA Dijital İmza Doğrulaması:** Kod ve uygulama bütünlüğü RSA ile imzalanmıştır.
+
+## 📦 Kurulum ve Çalıştırma
+
+### 1. Hazır Çalıştırılabilir Sürüm (.exe)
+Python kurmadan doğrudan çalıştırmak için [Releases](../../releases) sayfasından en son sürümü indirip `TürKod IDE.exe` dosyasını çalıştırabilirsiniz.
+
+### 2. Kaynak Koddan Çalıştırma (.py)
+```bash
+git clone [https://github.com/KULLANICI_ADIN/turkod-ide.git](https://github.com/KULLANICI_ADIN/turkod-ide.git)
+cd turkod-ide/src
+python "TürKod IDE.py"
+```
+🔐 Güvenlik ve RSA İmza
+Bu projedeki executable ve kaynak kod dosyaları RSA-2048 ile imzalanmıştır. Imza doğrulama için build/turkod_public.pem anahtarını kullanabilirsiniz.
+
+© 2026 Yusuf Tandoğan - Tüm Hakları Saklıdır.
