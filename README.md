@@ -1,6 +1,6 @@
 <img width="1280" height="720" alt="TürKod" src="https://github.com/user-attachments/assets/46423c98-91c9-4938-b595-e232cb6819ea" />
 
-<img width="1254" height="1000" alt="TürKod-Logo" src="https://github.com/user-attachments/assets/853c8706-0b35-461b-82f3-242d1ac541af" />
+<img width="1000" height="1000" alt="TürKod-Logo" src="https://github.com/user-attachments/assets/853c8706-0b35-461b-82f3-242d1ac541af" />
 
 
 
