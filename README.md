@@ -15,7 +15,7 @@ Python kurmadan doğrudan çalıştırmak için [Releases](../../releases) sayfa
 
 ### 2. Kaynak Koddan Çalıştırma (.py)
 ```bash
-git clone [https://github.com/YusufX-sys/turkod-ide.git](https://github.com/YusufX-sys/turkod-ide.git)
+git clone https://github.com/YusufX-sys/turkod-ide.git
 cd turkod-ide/src
 python "TürKod IDE.py"
 ```
