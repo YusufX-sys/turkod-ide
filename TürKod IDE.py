@@ -333,7 +333,7 @@ def _tamamlama_kelime_listesi_al(self):
 # Turkce-Python referans listesi (AI icin dahili kullanim, ayarlarda gorunmez)
 # ============ PYTHON'DAN TÜRKOD'A ÇEVİRİ ============
 # ============ SOZLUK (Turkish to Python) ============
-def _sozluk_yukle(dosya_adi="TürKod Sözlüğü.txt"):
+def _sozluk_yukle(dosya_adi="TurKod_Sozluk.txt"):
     """
     TürKod sözlüğünü yükle.
     .exe'de sys._MEIPASS'ten, .py'de script dizininden okur.
@@ -458,7 +458,7 @@ class AyarlarYoneticisi:
             -Sadece Python kodları ver başka bir dil kullanamazsın.
             """,
             "ai_sicaklik": 0.7,
-            "ai_max_token": 2048,
+            "ai_max_token": 4096,
             "son_proje_dizini": os.path.expanduser("~"),
             "son_acik_dosyalar": []
         }
@@ -502,7 +502,7 @@ TEMA_RENKLERI = {
         "ai_user": "#2d2d30", "ai_assistant": "#252526", "ai_input": "#3c3c3c",
         "minimap_bg": "#252526",
     },
-    "Acik": {
+    "Açık": {
         "bg": "#ffffff", "sidebar": "#f3f3f3", "activity_bar": "#e8e8e8",
         "tab_active": "#ffffff", "tab_inactive": "#ececec", "status_bar": "#0078d4",
         "line_number": "#237893", "text": "#000000", "keyword": "#0000ff",
@@ -513,7 +513,7 @@ TEMA_RENKLERI = {
         "ai_user": "#e8f4ff", "ai_assistant": "#f5f5f5", "ai_input": "#ffffff",
         "ai_chat_bg": "#f0f0f0", "minimap_bg": "#f3f3f3",
     },
-    "Yuksek Kontrast": {
+    "Yüksek Kontrast": {
         "bg": "#000000", "sidebar": "#000000", "activity_bar": "#000000",
         "tab_active": "#000000", "tab_inactive": "#000000", "status_bar": "#000000",
         "line_number": "#ffffff", "text": "#ffffff", "keyword": "#ffff00",
@@ -546,7 +546,7 @@ TEMA_RENKLERI = {
 }
 
 # ============ SOZLUK (Turkish to Python) ============
-def _sozluk_yukle(dosya_adi="TürKod Sözlüğü.txt"):
+def _sozluk_yukle(dosya_adi="TurKod_Sozluk.txt"):
     """
     TürKod sözlüğünü yükle.
     .exe'de sys._MEIPASS'ten, .py'de script dizininden okur.
@@ -851,6 +851,7 @@ class TurkceIDE(ctk.CTk):
         self._otomatik_kaydetme_baslat()
         self.after(200, self._pencere_goster)
         self._kod_tanimlari_cache = []
+        self._calistirma_process = None
         self._son_kod_hash = ""
 
     # ← BURAYA TAŞI! __init__ bitti, metodlar buraya başlıyor
@@ -1315,6 +1316,15 @@ class TurkceIDE(ctk.CTk):
         self.kod_alani.bind("<Button-5>", self._senkronize_scroll)
         self.kod_alani._y_scrollbar.bind("<B1-Motion>", lambda e: self._senkronize_scroll())
         self.kod_alani._y_scrollbar.bind("<ButtonRelease-1>", lambda e: self._senkronize_scroll())
+        if self.ayarlar.get("satir_numaralari"):
+            self.line_numbers.bind("<MouseWheel>", lambda e: self._senkronize_scroll())
+            self.line_numbers.bind("<Button-4>", lambda e: self._senkronize_scroll())
+            self.line_numbers.bind("<Button-5>", lambda e: self._senkronize_scroll())
+        
+        if self.ayarlar.get("minimap") and hasattr(self, 'minimap'):
+            self.minimap.bind("<MouseWheel>", lambda e: self._senkronize_scroll())
+            self.minimap.bind("<Button-4>", lambda e: self._senkronize_scroll())
+            self.minimap.bind("<Button-5>", lambda e: self._senkronize_scroll())
 
         self.popup = None
         self.listbox = None
@@ -1881,7 +1891,8 @@ class TurkceIDE(ctk.CTk):
                      font=("Segoe UI", 8), text_color="#666").pack(side="right")
 
         parcalar = self._ai_mesaj_parse_et(mesaj)
-        
+        panel_genislik = self.ai_panel.winfo_width()
+        wrap_length = max(200, panel_genislik - 80)  # Kenar boşlukları çıkar
         for parca in parcalar:
             if parca[0] == "metin":
                 text = parca[1]
@@ -1891,7 +1902,7 @@ class TurkceIDE(ctk.CTk):
                 msg_lbl = ctk.CTkLabel(bubble, text=text,
                                         font=("Segoe UI", 11),
                                         text_color=self.colors["text"],
-                                        wraplength=400, justify="left")
+                                        wraplength=wrap_length, justify="left")
                 msg_lbl.pack(anchor="w", padx=12, pady=(2, 6))
             else:
                 kod_frame = self._ai_kod_bloju_olustur(bubble, parca[1], parca[2])
@@ -2189,81 +2200,175 @@ Yapacakların:
         pencere.geometry("600x800")
         pencere.transient(self)
         pencere.grab_set()
+        self.ayarlar_penceresi = pencere
 
-        notebook = ctk.CTkTabview(pencere, width=560, height=620)
-        notebook.pack(padx=20, pady=20)
+        self.notebook = ctk.CTkTabview(pencere, width=560, height=620, fg_color=self.colors["bg"])
+        self.notebook.pack(padx=20, pady=20)
+        self.notebook._segmented_button.configure(
+            fg_color=self.colors.get("tab_inactive", self.colors["sidebar"]),
+            selected_color=self.colors.get("button_bg", "#0e639c"),
+            selected_hover_color=self.colors.get("button_hover", "#1177bb"),
+            unselected_color=self.colors.get("tab_inactive", self.colors["sidebar"]),
+            unselected_hover_color=self.colors.get("tab_active", self.colors["bg"]),
+            text_color=self.colors["text"]
+        )
 
         # === GENEL AYARLAR ===
-        notebook.add("Genel")
-        genel = notebook.tab("Genel")
+        self.notebook.add("Genel")
+        genel = self.notebook.tab("Genel")
 
-        ctk.CTkLabel(genel, text="Tema:", font=("Segoe UI", 12, "bold")).pack(anchor="w", pady=(10, 0), padx=10)
+        ctk.CTkLabel(genel, text="Tema:", font=("Segoe UI", 12, "bold"), text_color=self.colors["text"]).pack(anchor="w", pady=(10, 0), padx=10)
         tema_var = ctk.StringVar(value=self.ayarlar.get("tema"))
-        tema_combo = ctk.CTkOptionMenu(genel, values=list(TEMA_RENKLERI.keys()), variable=tema_var)
+        tema_combo = ctk.CTkOptionMenu(
+            genel, 
+            values=list(TEMA_RENKLERI.keys()), 
+            variable=tema_var,
+            fg_color=self.colors.get("button_bg", "#0e639c"),
+            button_color=self.colors.get("button_hover", "#1177bb"),
+            button_hover_color=self.colors.get("button_hover", "#1177bb"),
+            dropdown_fg_color=self.colors.get("sidebar", "#252526"),
+            dropdown_hover_color=self.colors.get("selection", "#264f78"),
+            text_color=self.colors["text"],
+            dropdown_text_color=self.colors["text"]
+        )
         tema_combo.pack(fill="x", padx=10, pady=5)
 
-        ctk.CTkLabel(genel, text="Yazi Tipi:", font=("Segoe UI", 12, "bold")).pack(anchor="w", pady=(10, 0), padx=10)
+        ctk.CTkLabel(genel, text="Yazi Tipi:", font=("Segoe UI", 12, "bold"), text_color=self.colors["text"]).pack(anchor="w", pady=(10, 0), padx=10)
         yazi_var = ctk.StringVar(value=self.ayarlar.get("yazi_tipi"))
-        yazi_combo = ctk.CTkOptionMenu(genel, values=["Consolas", "Courier New", "Fira Code", "JetBrains Mono", "Source Code Pro"], variable=yazi_var)
+        yazi_combo = ctk.CTkOptionMenu(
+            genel, 
+            values=["Consolas", "Courier New", "Fira Code", "JetBrains Mono", "Source Code Pro"], 
+            variable=yazi_var,
+            fg_color=self.colors.get("button_bg", "#0e639c"),
+            button_color=self.colors.get("button_hover", "#1177bb"),
+            button_hover_color=self.colors.get("button_hover", "#1177bb"),
+            dropdown_fg_color=self.colors.get("sidebar", "#252526"),
+            dropdown_hover_color=self.colors.get("selection", "#264f78"),
+            text_color=self.colors["text"],
+            dropdown_text_color=self.colors["text"]
+        )
         yazi_combo.pack(fill="x", padx=10, pady=5)
 
-        ctk.CTkLabel(genel, text="Yazi Boyutu:", font=("Segoe UI", 12, "bold")).pack(anchor="w", pady=(10, 0), padx=10)
+        ctk.CTkLabel(genel, text="Yazi Boyutu:", font=("Segoe UI", 12, "bold"), text_color=self.colors["text"]).pack(anchor="w", pady=(10, 0), padx=10)
         boyut_var = ctk.IntVar(value=self.ayarlar.get("yazi_boyutu"))
-        boyut_slider = ctk.CTkSlider(genel, from_=8, to=32, number_of_steps=24, variable=boyut_var)
-        boyut_slider.pack(fill="x", padx=10, pady=5)
-        boyut_label = ctk.CTkLabel(genel, textvariable=boyut_var)
-        boyut_label.pack(anchor="w", padx=10)
+        self.slider_boyut = ctk.CTkSlider(
+            genel, 
+            from_=8, 
+            to=32, 
+            number_of_steps=24, 
+            variable=boyut_var,
+            fg_color=self.colors.get("sidebar", self.colors["bg"]),
+            progress_color=self.colors.get("button_bg", "#0e639c"),
+            button_color=self.colors.get("button_bg", "#0e639c"),
+            button_hover_color=self.colors.get("button_hover", "#1177bb")
+        )
+        self.slider_boyut.pack(fill="x", padx=10, pady=5)
+        self.label_boyut = ctk.CTkLabel(genel, textvariable=boyut_var, text_color=self.colors["text"])
+        self.label_boyut.pack(anchor="w", padx=10)
 
         satir_var = ctk.BooleanVar(value=self.ayarlar.get("satir_numaralari"))
-        satir_cb = ctk.CTkCheckBox(genel, text="Satır Numaralarını Göster", variable=satir_var)
+        satir_cb = ctk.CTkCheckBox(genel, text="Satır Numaralarını Göster", variable=satir_var,
+            text_color=self.colors["text"],
+            fg_color=self.colors.get("button_bg", "#0e639c"),
+            hover_color=self.colors.get("button_hover", "#1177bb"))
         satir_cb.pack(anchor="w", pady=5, padx=10)
 
         sar_var = ctk.BooleanVar(value=self.ayarlar.get("kelime_sar"))
-        sar_cb = ctk.CTkCheckBox(genel, text="Kelime Sarma (Word Wrap)", variable=sar_var)
+        sar_cb = ctk.CTkCheckBox(genel, text="Kelime Sarma (Word Wrap)", variable=sar_var,
+            text_color=self.colors["text"],
+            fg_color=self.colors.get("button_bg", "#0e639c"),
+            hover_color=self.colors.get("button_hover", "#1177bb"))
         sar_cb.pack(anchor="w", pady=5, padx=10)
 
         # === EDITOR AYARLARI ===
-        notebook.add("Editor")
-        editor = notebook.tab("Editor")
+        self.notebook.add("Editor")
+        editor = self.notebook.tab("Editor")
 
         tamamlama_var = ctk.BooleanVar(value=self.ayarlar.get("otomatik_tamamlama"))
-        tamamlama_cb = ctk.CTkCheckBox(editor, text="Otomatik Tamamlama", variable=tamamlama_var)
+        tamamlama_cb = ctk.CTkCheckBox(editor, text="Otomatik Tamamlama", variable=tamamlama_var,
+            text_color=self.colors["text"],
+            fg_color=self.colors.get("button_bg", "#0e639c"),
+            hover_color=self.colors.get("button_hover", "#1177bb"))
         tamamlama_cb.pack(anchor="w", pady=10, padx=10)
 
         oto_kaydet_var = ctk.BooleanVar(value=self.ayarlar.get("otomatik_kaydetme"))
-        oto_kaydet_cb = ctk.CTkCheckBox(editor, text="Otomatik Kaydetme", variable=oto_kaydet_var)
+        oto_kaydet_cb = ctk.CTkCheckBox(editor, text="Otomatik Kaydetme", variable=oto_kaydet_var,
+            text_color=self.colors["text"],
+            fg_color=self.colors.get("button_bg", "#0e639c"),
+            hover_color=self.colors.get("button_hover", "#1177bb"))
         oto_kaydet_cb.pack(anchor="w", pady=5, padx=10)
 
-        ctk.CTkLabel(editor, text="Oto. Kaydetme Araligi (sn):", font=("Segoe UI", 11)).pack(anchor="w", pady=(10, 0), padx=10)
+        ctk.CTkLabel(editor, text="Oto. Kaydetme Aralığı (sn):", font=("Segoe UI", 11), text_color=self.colors["text"]).pack(anchor="w", pady=(10, 0), padx=10)
         aralik_var = ctk.IntVar(value=self.ayarlar.get("otomatik_kaydetme_aralik"))
-        aralik_slider = ctk.CTkSlider(editor, from_=5, to=300, number_of_steps=59, variable=aralik_var)
-        aralik_slider.pack(fill="x", padx=10, pady=5)
-        aralik_label = ctk.CTkLabel(editor, textvariable=aralik_var)
-        aralik_label.pack(anchor="w", padx=10)
+        self.slider_aralik = ctk.CTkSlider(
+            editor,
+            from_=5,
+            to=300,
+            number_of_steps=59,
+            variable=aralik_var,
+            fg_color=self.colors.get("sidebar", self.colors["bg"]),
+            progress_color=self.colors.get("button_bg", "#0e639c"),
+            button_color=self.colors.get("button_bg", "#0e639c"),
+            button_hover_color=self.colors.get("button_hover", "#1177bb")
+        )
+        self.slider_aralik.pack(fill="x", padx=10, pady=5)
+        self.label_aralik = ctk.CTkLabel(editor, textvariable=aralik_var, text_color=self.colors["text"])
+        self.label_aralik.pack(anchor="w", padx=10)
 
         bosluk_var = ctk.BooleanVar(value=self.ayarlar.get("bosluk_gostergesi"))
-        bosluk_cb = ctk.CTkCheckBox(editor, text="Boşluk Göstergesi", variable=bosluk_var)
+        bosluk_cb = ctk.CTkCheckBox(editor, text="Boşluk Göstergesi", variable=bosluk_var,
+            text_color=self.colors["text"],
+            fg_color=self.colors.get("button_bg", "#0e639c"),
+            hover_color=self.colors.get("button_hover", "#1177bb"))
         bosluk_cb.pack(anchor="w", pady=5, padx=10)
 
         minimap_var = ctk.BooleanVar(value=self.ayarlar.get("minimap"))
-        minimap_cb = ctk.CTkCheckBox(editor, text="Minimap (Küçük Harita)", variable=minimap_var)
+        minimap_cb = ctk.CTkCheckBox(editor, text="Minimap (Küçük Harita)", variable=minimap_var,
+            text_color=self.colors["text"],
+            fg_color=self.colors.get("button_bg", "#0e639c"),
+            hover_color=self.colors.get("button_hover", "#1177bb"))
         minimap_cb.pack(anchor="w", pady=5, padx=10)
         
         # === AI AYARLARI ===
-        notebook.add("AI Asistan")
-        ai_tab = notebook.tab("AI Asistan")
+        self.notebook.add("AI Asistan")
+        ai_tab = self.notebook.tab("AI Asistan")
 
         ai_aktif_var = ctk.BooleanVar(value=self.ayarlar.get("ai_aktif"))
-        ai_aktif_cb = ctk.CTkCheckBox(ai_tab, text="AI Asistanı Aktif", variable=ai_aktif_var)
+        ai_aktif_cb = ctk.CTkCheckBox(ai_tab, text="AI Asistanı Aktif", variable=ai_aktif_var,
+            text_color=self.colors["text"],
+            fg_color=self.colors.get("button_bg", "#0e639c"),
+            hover_color=self.colors.get("button_hover", "#1177bb"))
         ai_aktif_cb.pack(anchor="w", pady=10, padx=10)
 
-        ctk.CTkLabel(ai_tab, text="AI Sağlayıcı:", font=("Segoe UI", 12, "bold")).pack(anchor="w", pady=(10, 0), padx=10)
+        ctk.CTkLabel(ai_tab, text="AI Sağlayıcı:", font=("Segoe UI", 12, "bold"), text_color=self.colors["text"]).pack(anchor="w", pady=(10, 0), padx=10)
         saglayici_var = ctk.StringVar(value=self.ayarlar.get("ai_saglayici"))
-        saglayici_combo = ctk.CTkOptionMenu(ai_tab, values=list(AI_MODELLERI.keys()), variable=saglayici_var)
+        saglayici_combo = ctk.CTkOptionMenu(
+            ai_tab, 
+            values=list(AI_MODELLERI.keys()), 
+            variable=saglayici_var,
+            fg_color=self.colors.get("button_bg", "#0e639c"),
+            button_color=self.colors.get("button_hover", "#1177bb"),
+            button_hover_color=self.colors.get("button_hover", "#1177bb"),
+            dropdown_fg_color=self.colors.get("sidebar", "#252526"),
+            dropdown_hover_color=self.colors.get("selection", "#264f78"),
+            text_color=self.colors["text"],
+            dropdown_text_color=self.colors["text"]
+        )
         saglayici_combo.pack(fill="x", padx=10, pady=5)
 
         model_var = ctk.StringVar(value=self.ayarlar.get("ai_model"))
-        model_combo = ctk.CTkOptionMenu(ai_tab, values=AI_MODELLERI.get(saglayici_var.get(), ["gpt-4o-mini"]), variable=model_var)
+        model_combo = ctk.CTkOptionMenu(
+            ai_tab, 
+            values=AI_MODELLERI.get(saglayici_var.get(), ["gpt-4o-mini"]), 
+            variable=model_var,
+            fg_color=self.colors.get("button_bg", "#0e639c"),
+            button_color=self.colors.get("button_hover", "#1177bb"),
+            button_hover_color=self.colors.get("button_hover", "#1177bb"),
+            dropdown_fg_color=self.colors.get("sidebar", "#252526"),
+            dropdown_hover_color=self.colors.get("selection", "#264f78"),
+            text_color=self.colors["text"],
+            dropdown_text_color=self.colors["text"]
+        )
         model_combo.pack(fill="x", padx=10, pady=5)
 
         def saglayici_degisti(*args):
@@ -2271,32 +2376,58 @@ Yapacakların:
             model_var.set(AI_MODELLERI.get(saglayici_var.get(), ["gpt-4o-mini"])[0])
         saglayici_var.trace_add("write", saglayici_degisti)
 
-        ctk.CTkLabel(ai_tab, text="API Key:", font=("Segoe UI", 12, "bold")).pack(anchor="w", pady=(10, 0), padx=10)
+        ctk.CTkLabel(ai_tab, text="API Key:", font=("Segoe UI", 12, "bold"), text_color=self.colors["text"]).pack(anchor="w", pady=(10, 0), padx=10)
         api_key_var = ctk.StringVar(value=self.ayarlar.get("ai_api_key"))
-        api_key_entry = ctk.CTkEntry(ai_tab, textvariable=api_key_var, show="*", width=500)
+        api_key_entry = ctk.CTkEntry(ai_tab, textvariable=api_key_var, show="*", width=500,
+            fg_color=self.colors.get("ai_input", "#3c3c3c"),
+            text_color=self.colors["text"],
+            border_color=self.colors.get("border", "#3c3c3c"))
         api_key_entry.pack(fill="x", padx=10, pady=5)
 
-        ctk.CTkLabel(ai_tab, text="Sistem Mesajı:", font=("Segoe UI", 12, "bold")).pack(anchor="w", pady=(10, 0), padx=10)
+        ctk.CTkLabel(ai_tab, text="Sistem Mesajı:", font=("Segoe UI", 12, "bold"), text_color=self.colors["text"]).pack(anchor="w", pady=(10, 0), padx=10)
         sistem_var = ctk.StringVar(value=self.ayarlar.get("ai_sistem_mesaji"))
-        sistem_entry = ctk.CTkEntry(ai_tab, textvariable=sistem_var, width=500)
+        sistem_entry = ctk.CTkEntry(ai_tab, textvariable=sistem_var, width=500,
+            fg_color=self.colors.get("ai_input", "#3c3c3c"),
+            text_color=self.colors["text"],
+            border_color=self.colors.get("border", "#3c3c3c"))
         sistem_entry.pack(fill="x", padx=10, pady=5)
 
-        ctk.CTkLabel(ai_tab, text="Sıcaklık (0-2):", font=("Segoe UI", 11)).pack(anchor="w", pady=(10, 0), padx=10)
+        ctk.CTkLabel(ai_tab, text="Sıcaklık (0-2):", font=("Segoe UI", 11), text_color=self.colors["text"]).pack(anchor="w", pady=(10, 0), padx=10)
         sicaklik_var = ctk.DoubleVar(value=self.ayarlar.get("ai_sicaklik"))
-        sicaklik_slider = ctk.CTkSlider(ai_tab, from_=0, to=2, number_of_steps=20, variable=sicaklik_var)
-        sicaklik_slider.pack(fill="x", padx=10, pady=5)
-        sicaklik_label = ctk.CTkLabel(ai_tab, textvariable=sicaklik_var)
-        sicaklik_label.pack(anchor="w", padx=10)
+        self.slider_sicaklik = ctk.CTkSlider(
+            ai_tab,
+            from_=0,
+            to=2,
+            number_of_steps=20,
+            variable=sicaklik_var,
+            fg_color=self.colors.get("sidebar", self.colors["bg"]),
+            progress_color=self.colors.get("button_bg", "#0e639c"),
+            button_color=self.colors.get("button_bg", "#0e639c"),
+            button_hover_color=self.colors.get("button_hover", "#1177bb")
+        )
+        self.slider_sicaklik.pack(fill="x", padx=10, pady=5)
+        self.label_sicaklik = ctk.CTkLabel(ai_tab, textvariable=sicaklik_var, text_color=self.colors["text"])
+        self.label_sicaklik.pack(anchor="w", padx=10)
 
-        ctk.CTkLabel(ai_tab, text="Max Token:", font=("Segoe UI", 11)).pack(anchor="w", pady=(10, 0), padx=10)
+        ctk.CTkLabel(ai_tab, text="Max Token:", font=("Segoe UI", 11), text_color=self.colors["text"]).pack(anchor="w", pady=(10, 0), padx=10)
         token_var = ctk.IntVar(value=self.ayarlar.get("ai_max_token"))
-        token_slider = ctk.CTkSlider(ai_tab, from_=4096, to=32768, number_of_steps=30, variable=token_var)
-        token_slider.pack(fill="x", padx=10, pady=5)
-        token_label = ctk.CTkLabel(ai_tab, textvariable=token_var)
-        token_label.pack(anchor="w", padx=10)
+        self.slider_token = ctk.CTkSlider(
+            ai_tab,
+            from_=4096,
+            to=32768,
+            number_of_steps=30,
+            variable=token_var,
+            fg_color=self.colors.get("sidebar", self.colors["bg"]),
+            progress_color=self.colors.get("button_bg", "#0e639c"),
+            button_color=self.colors.get("button_bg", "#0e639c"),
+            button_hover_color=self.colors.get("button_hover", "#1177bb")
+        )
+        self.slider_token.pack(fill="x", padx=10, pady=5)
+        self.label_token = ctk.CTkLabel(ai_tab, textvariable=token_var, text_color=self.colors["text"])
+        self.label_token.pack(anchor="w", padx=10)
         # === HAKKIMDA ===
-        notebook.add("Hakkımda")
-        hakkinda = notebook.tab("Hakkımda")
+        self.notebook.add("Hakkımda")
+        hakkinda = self.notebook.tab("Hakkımda")
 
         # ===== BAŞLIK =====
         ctk.CTkLabel(hakkinda, text="TürKod IDE", 
@@ -2322,7 +2453,7 @@ Yapacakların:
         ctk.CTkLabel(hakkinda, text="yusuftndgn.2@gmail.com",  
                      font=("Segoe UI", 10), text_color="#888").pack()
 
-        ctk.CTkLabel(hakkinda, text="Versiyon 1.0  |  © 2026 Tüm Hakları Saklıdır", 
+        ctk.CTkLabel(hakkinda, text="Versiyon 1.1  |  © 2026 Tüm Hakları Saklıdır", 
                      font=("Segoe UI", 10), text_color="#666").pack(pady=(0, 10))
 
         # ===== RSA DİJİTAL İMZA KUTUSU =====
@@ -2397,14 +2528,14 @@ Yapacakların:
         self.after(500, self._hakkimda_imza_kontrol)
         # ===== KAYDET BUTONU =====
         def kaydet_ayarlar():
-            self.ayarlar.set("tema", tema_var.get())
+            self.ayarlar.set("tema", tema_combo.get())
             self.ayarlar.set("yazi_tipi", yazi_var.get())
-            self.ayarlar.set("yazi_boyutu", boyut_var.get())
+            self.ayarlar.set("yazi_boyutu", int(self.slider_boyut.get()))
             self.ayarlar.set("satir_numaralari", satir_var.get())
             self.ayarlar.set("kelime_sar", sar_var.get())
             self.ayarlar.set("otomatik_tamamlama", tamamlama_var.get())
             self.ayarlar.set("otomatik_kaydetme", oto_kaydet_var.get())
-            self.ayarlar.set("otomatik_kaydetme_aralik", aralik_var.get())
+            self.ayarlar.set("otomatik_kaydetme_aralik", int(self.slider_aralik.get()))
             self.ayarlar.set("bosluk_gostergesi", bosluk_var.get())
             self.ayarlar.set("minimap", minimap_var.get())
             self.ayarlar.set("ai_aktif", ai_aktif_var.get())
@@ -2412,11 +2543,15 @@ Yapacakların:
             self.ayarlar.set("ai_model", model_var.get())
             self.ayarlar.set("ai_api_key", api_key_var.get())
             self.ayarlar.set("ai_sistem_mesaji", sistem_var.get())
-            self.ayarlar.set("ai_sicaklik", sicaklik_var.get())
-            self.ayarlar.set("ai_max_token", token_var.get())
+            self.ayarlar.set("ai_sicaklik", float(self.slider_sicaklik.get()))
+            self.ayarlar.set("ai_max_token", int(self.slider_token.get()))
 
-            self.tema = tema_var.get()
+            self.tema = tema_combo.get()
             self.colors = TEMA_RENKLERI.get(self.tema, TEMA_RENKLERI["Koyu"])
+            # === WORD WRAP GÜNCELLEME ===
+            self.kod_alani.configure(
+                wrap="word" if self.ayarlar.get("kelime_sar") else "none"
+            )
             
             # Ayarlari aninda UI grid'e yansit
             if satir_var.get():
@@ -2486,7 +2621,23 @@ Yapacakların:
             )
             sekme["label"].configure(text_color=self.colors["text"])
             sekme["kapat_btn"].configure(text_color=self.colors["text"])
-
+            
+        # HAKKIMDA PANELİ (eğer açıksa veya referans varsa)
+        if hasattr(self, 'rsa_frame') and self.rsa_frame.winfo_exists():
+            self.rsa_frame.configure(fg_color=self.colors["sidebar"], border_color=self.colors["border"])
+        if hasattr(self, 'rsa_durum') and self.rsa_durum.winfo_exists():
+            self.rsa_durum.configure(text_color=self.colors["panel_fg"])
+        if hasattr(self, 'rsa_detay') and self.rsa_detay.winfo_exists():
+            self.rsa_detay.configure(text_color="#666")
+            
+        # EDİTÖR FONT GÜNCELLEME
+        yeni_font = (self.ayarlar.get("yazi_tipi"), self.ayarlar.get("yazi_boyutu"))
+        self.kod_alani.configure(font=yeni_font)
+        self.line_numbers.configure(font=yeni_font)
+        
+        if hasattr(self, 'minimap') and self.minimap.winfo_exists():
+            self.minimap.configure(font=(self.ayarlar.get("yazi_tipi"), 4))
+            
         # Tab Butonları
         self.yeni_sekme_btn.configure(fg_color=self.colors["button_bg"], hover_color=self.colors["button_hover"], border_color=self.colors["border"])
         self.ac_btn.configure(fg_color=self.colors["button_bg"], hover_color=self.colors["button_hover"], border_color=self.colors["border"])
@@ -2520,6 +2671,139 @@ Yapacakların:
 
         self.renk_ayarlarini_yap()
         self.kod_renklendir()
+        # === AYARLAR PENCERESI DE GUNCELLENSIN ===
+        if hasattr(self, 'ayarlar_penceresi') and self.ayarlar_penceresi.winfo_exists():
+            self.ayarlar_penceresi.configure(fg_color=self.colors["bg"])
+        # === AYARLAR PENCERESI NOTEBOOK TAB'LARI GUNCELLEME ===
+        if hasattr(self, 'notebook') and self.notebook.winfo_exists():
+            # Notebook'un kendisi
+            self.notebook.configure(fg_color=self.colors["bg"])
+            
+            # Segmented button (tab başlıkları)
+            if hasattr(self.notebook, '_segmented_button') and self.notebook._segmented_button:
+                self.notebook._segmented_button.configure(
+                    fg_color=self.colors.get("tab_inactive", self.colors["sidebar"]),
+                    selected_color=self.colors.get("button_bg", "#0e639c"),
+                    selected_hover_color=self.colors.get("button_hover", "#1177bb"),
+                    unselected_color=self.colors.get("tab_inactive", self.colors["sidebar"]),
+                    unselected_hover_color=self.colors.get("tab_active", self.colors["bg"]),
+                    text_color=self.colors["text"],
+                    text_color_disabled=self.colors.get("line_number", "#858585")
+                )
+            
+            # Her bir tab'ın içeriği (frame)
+            if hasattr(self.notebook, '_tab_dict'):
+                for tab in self.notebook._tab_dict.values():
+                    tab.configure(fg_color=self.colors["bg"])
+            
+            def _widget_renk_guncelle(widget, derinlik=0):
+                if derinlik > 6:
+                    return
+                try:
+                    if isinstance(widget, ctk.CTkFrame):
+                        # Tab içeriği mi kontrol et (CTkTabview'in _tab_dict içinde mi?)
+                        is_tab_content = False
+                        try:
+                            parent = widget.master
+                            while parent:
+                                if isinstance(parent, ctk.CTkTabview):
+                                    is_tab_content = True
+                                    break
+                                parent = parent.master
+                        except:
+                            pass
+                        
+                        if is_tab_content:
+                            # Tab içeriği = arka plan rengi
+                            widget.configure(
+                                fg_color=self.colors["bg"],
+                                border_color=self.colors["border"]
+                            )
+                        else:
+                            # Normal frame = sidebar rengi
+                            widget.configure(
+                                fg_color=self.colors.get("sidebar", self.colors["bg"]),
+                                border_color=self.colors["border"]
+                            )
+                    elif isinstance(widget, ctk.CTkLabel):
+                        widget.configure(text_color=self.colors["text"])
+                    elif isinstance(widget, ctk.CTkCheckBox):
+                        widget.configure(
+                            text_color=self.colors["text"],
+                            fg_color=self.colors.get("button_bg", "#0e639c"),
+                            hover_color=self.colors.get("button_hover", "#1177bb")
+                        )
+                    elif isinstance(widget, ctk.CTkEntry):
+                        widget.configure(
+                            fg_color=self.colors.get("ai_input", "#3c3c3c"),
+                            text_color=self.colors["text"],
+                            border_color=self.colors["border"]
+                        )
+                    elif isinstance(widget, ctk.CTkOptionMenu):
+                        widget.configure(
+                            fg_color=self.colors.get("button_bg", "#0e639c"),
+                            text_color=self.colors["text"],
+                            button_color=self.colors.get("button_hover", "#1177bb"),
+                            button_hover_color=self.colors.get("button_hover", "#1177bb")
+                        )
+                    elif isinstance(widget, ctk.CTkSlider):
+                        widget.configure(
+                            fg_color=self.colors.get("sidebar", self.colors["bg"]),
+                            progress_color=self.colors.get("button_bg", "#0e639c"),
+                            button_color=self.colors.get("button_bg", "#0e639c"),
+                            button_hover_color=self.colors.get("button_hover", "#1177bb")
+                        )
+                    elif isinstance(widget, ctk.CTkButton):
+                        widget.configure(
+                            fg_color=self.colors.get("button_bg", "#0e639c"),
+                            hover_color=self.colors.get("button_hover", "#1177bb"),
+                            text_color=self.colors["text"],
+                            border_color=self.colors["border"]
+                        )
+                except Exception:
+                    pass
+                for child in widget.winfo_children():
+                    _widget_renk_guncelle(child, derinlik + 1)
+            
+            _widget_renk_guncelle(self.ayarlar_penceresi)
+            # === AYARLAR PENCERESI NOTEBOOK TAB'LARI GUNCELLEME ===
+            if hasattr(self, 'notebook') and self.notebook.winfo_exists():
+                self.notebook.configure(fg_color=self.colors["bg"])
+                if hasattr(self.notebook, '_segmented_button') and self.notebook._segmented_button:
+                    self.notebook._segmented_button.configure(
+                        fg_color=self.colors.get("tab_inactive", self.colors["sidebar"]),
+                        selected_color=self.colors.get("button_bg", "#0e639c"),
+                        selected_hover_color=self.colors.get("button_hover", "#1177bb"),
+                        unselected_color=self.colors.get("tab_inactive", self.colors["sidebar"]),
+                        unselected_hover_color=self.colors.get("tab_active", self.colors["bg"]),
+                        text_color=self.colors["text"],
+                        text_color_disabled=self.colors.get("line_number", "#858585")
+                    )
+                if hasattr(self.notebook, '_tab_dict'):
+                    for tab in self.notebook._tab_dict.values():
+                        tab.configure(fg_color=self.colors["bg"])
+            # === SLIDER'LARI DOĞRUDAN GÜNCELLE ===
+            # CTkTabview içinde oldukları için recursive bulunamayabilirler
+            slider_renkleri = {
+                "fg_color": self.colors.get("sidebar", self.colors["bg"]),
+                "progress_color": self.colors.get("button_bg", "#0e639c"),
+                "button_color": self.colors.get("button_bg", "#0e639c"),
+                "button_hover_color": self.colors.get("button_hover", "#1177bb")
+            }
+            for attr in ['slider_boyut', 'slider_aralik', 'slider_sicaklik', 'slider_token']:
+                if hasattr(self, attr):
+                    try:
+                        getattr(self, attr).configure(**slider_renkleri)
+                    except Exception:
+                        pass
+                    
+            # === DEĞER LABEL'LARINI DOĞRUDAN GÜNCELLE ===
+            for attr in ['label_boyut', 'label_aralik', 'label_sicaklik', 'label_token']:
+                if hasattr(self, attr):
+                    try:
+                        getattr(self, attr).configure(text_color=self.colors["text"])
+                    except Exception:
+                        pass
     def _hakkimda_imza_kontrol(self):
         """Hakkımda sekmesindeki RSA imzasını kontrol et ve göster"""
         try:
@@ -2639,53 +2923,67 @@ Yapacakların:
         if not self.ayarlar.get("otomatik_tamamlama"):
             return
         
-        # ⬅️ YENİ: Dinamik kelime listesi al
         tum_kelimeler = self._tamamlama_kelime_listesi_al()
-        
         if not tum_kelimeler:
             return
         
-        # Eşleşmeleri bul (kod tanımları öncelikli)
+        # Eşleşmeleri bul
         eslesmeler = []
-        
-        # Önce kod içi tanımları ara
         kod_tanimlari = self._koddan_tanimlari_cikar(self.kod_alani.get("1.0", "end-1c"))
         for k in kod_tanimlari:
             if k.lower().startswith(kelime.lower()) and k.lower() != kelime.lower():
-                eslesmeler.append(("📌", k))  # 📌 = kod içi tanım
-        
-        # Sonra sözlük kelimelerini ara
+                eslesmeler.append(("📌", k))
         for k in TURKCE_KELIMELER:
             if k.lower().startswith(kelime.lower()) and k.lower() != kelime.lower():
-                if k not in [x[1] for x in eslesmeler]:  # Tekrar ekleme
-                    eslesmeler.append(("📚", k))  # 📚 = sözlük kelimesi
+                if k not in [x[1] for x in eslesmeler]:
+                    eslesmeler.append(("📚", k))
         
         if not eslesmeler or len(kelime) < 2:
             self.popup_kapat()
             return
 
-        # Popup oluştur/güncelle
+        # Tema renklerini al
+        bg_color = self.colors.get("sidebar", "#252526")
+        fg_color = self.colors.get("text", "#d4d4d4")
+        select_bg = self.colors.get("selection", "#04395e")
+        select_fg = "#ffffff"
+        border_color = self.colors.get("border", "#3c3c3c")
+
         if not self.popup:
             self.popup = tk.Toplevel(self)
             self.popup.wm_overrideredirect(True)
             self.popup.wm_attributes("-topmost", True)
 
             self.listbox = tk.Listbox(
-                self.popup, bg="#252526", fg="#d4d4d4", selectbackground="#04395e",
-                selectforeground="#ffffff", font=("Consolas", 11), bd=1, relief="solid"
+                self.popup, 
+                bg=bg_color, 
+                fg=fg_color, 
+                selectbackground=select_bg,
+                selectforeground=select_fg, 
+                font=("Consolas", 11), 
+                bd=1, 
+                relief="solid",
+                highlightbackground=border_color,
+                highlightcolor=border_color
             )
             self.listbox.pack(fill="both", expand=True)
             self.listbox.bind("<Double-Button-1>", lambda e: self.kelime_tamamla())
             self.listbox.bind("<Return>", lambda e: self.kelime_tamamla())
 
-        self.listbox.delete(0, tk.END)
-        
-        # ⬅️ YENİ: İkonlu gösterim
-        for ikon, item in eslesmeler[:15]:  # Max 15 öneri
-            self.listbox.insert(tk.END, f"{ikon} {item}")
-        
-        self.listbox.select_set(0)
+        # Renkleri güncelle (tema değişiminde)
+        self.listbox.configure(
+            bg=bg_color,
+            fg=fg_color,
+            selectbackground=select_bg,
+            highlightbackground=border_color
+        )
+        self.popup.configure(bg=bg_color)
 
+        self.listbox.delete(0, tk.END)
+        for ikon, item in eslesmeler[:15]:
+            self.listbox.insert(tk.END, f"{ikon} {item}")
+        self.listbox.select_set(0)
+        
         try:
             bbox = self.kod_alani._textbox.bbox("insert")
             if bbox:
@@ -2795,6 +3093,17 @@ Yapacakların:
                 self._status_guncelle()
 
     def kodu_calistir(self):
+        # Önceki çalışan process'i kapat
+        if self._calistirma_process is not None:
+            try:
+                self._calistirma_process.terminate()
+                self._calistirma_process.wait(timeout=2)
+            except:
+                try:
+                    self._calistirma_process.kill()
+                except:
+                    pass
+            self._calistirma_process = None
         turkce_kod = self.kod_alani.get("1.0", "end")
         python_kodu = turkce_kodu_donustur(turkce_kod)
 
@@ -2809,37 +3118,40 @@ Yapacakların:
             f.write(RUNNER_KODU)
 
         # ==================== PYTHON BULMA ====================
+        python_exe = None
+        
         if getattr(sys, 'frozen', False):
-            # PyInstaller .exe - once _internal'da python.exe ara
+            # 1. Önce _internal/python_embed/ var mı? (taşınabilir Python)
             exe_dir = os.path.dirname(sys.executable)
-            internal_dir = os.path.join(exe_dir, "_internal")
-            python_exe = os.path.join(internal_dir, "python.exe")
+            embed_python = os.path.join(exe_dir, "_internal", "python_embed", "python.exe")
+            if os.path.exists(embed_python):
+                python_exe = embed_python
             
-            if not os.path.exists(python_exe):
-                # _internal'da yoksa, exe ile ayni klasore bak
-                python_exe = os.path.join(exe_dir, "python.exe")
+            # 2. Yoksa sistemdeki Python'u dene
+            if not python_exe:
+                import shutil
+                python_exe = shutil.which("python.exe") or shutil.which("python")
                 
-                if not os.path.exists(python_exe):
-                    # Son care: sistem PATH'inden Python ara
-                    import shutil
-                    python_exe = shutil.which("python.exe")
-                    
-                    if not python_exe:
-                        messagebox.showerror(
-                            "Python Bulunamadi",
-                            "Kodu calistirmak icin Python 3.12+ gerekli.\n\n"
-                            "Lutfen Python'u kurun:\nhttps://python.org/downloads"
-                        )
-                        return
+            # 3. Hala yoksa hata ver
+            if not python_exe:
+                messagebox.showerror(
+                    "Python Gerekli",
+                    "Kodu çalıştırmak için Python 3.x gerekli.\n\n"
+                    "Python kurulu olmayan bilgisayarlarda:\n"
+                    "1. https://python.org/downloads adresinden indirin\n"
+                    "2. Kurulumda 'Add Python to PATH' seçeneğini işaretleyin\n\n"
+                    "Veya geliştirici modunda taşınabilir Python paketini "
+                    "_internal/python_embed/ klasörüne ekleyin."
+                )
+                return
         else:
-            # Normal .py calismasi
             python_exe = sys.executable
             if python_exe.endswith("pythonw.exe"):
                 python_exe = python_exe.replace("pythonw.exe", "python.exe")
 
         # ==================== CALISTIRMA ====================
         if os.name == "nt":
-            subprocess.Popen(
+            self._calistirma_process = subprocess.Popen(
                 [python_exe, "-X", "utf8", "-i", runner_path],
                 cwd=temp_dir,
                 creationflags=subprocess.CREATE_NEW_CONSOLE
