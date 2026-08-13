@@ -278,6 +278,7 @@ def calisma_yolu(dosya_adi=""):
 import customtkinter as ctk
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
+import tkinter.font as tkfont
 import re
 import subprocess
 import tempfile
@@ -286,50 +287,8 @@ import threading
 import time
 from datetime import datetime
 import ast
+import uuid
 
-def _koddan_tanimlari_cikar(self, kod):
-    """Koddan fonksiyon, sınıf ve değişken isimlerini çıkar"""
-    tanimlar = set()
-    
-    # Fonksiyon tanımları: fonksiyon isim(...):
-    fonksiyonlar = re.findall(r'\bfonksiyon\s+([a-zA-Z_][a-zA-Z0-9_ÇŞĞÜÖİçşğüöı]*)\s*\(', kod)
-    tanimlar.update(fonksiyonlar)
-    
-    # Sınıf tanımları: sinif Isim:
-    siniflar = re.findall(r'\bsinif\s+([a-zA-Z_][a-zA-Z0-9_ÇŞĞÜÖİçşğüöı]*)\s*:', kod)
-    tanimlar.update(siniflar)
-    
-    # Değişken atamaları: degisken = ...
-    # TürKod'da değişken tanımı doğrudan atama ile olur
-    degiskenler = re.findall(r'^([a-zA-Z_][a-zA-Z0-9_ÇŞĞÜÖİçşğüöı]*)\s*=', kod, re.MULTILINE)
-    tanimlar.update(degiskenler)
-    
-    # self.degisken atamaları
-    self_degiskenler = re.findall(r'\bself\.([a-zA-Z_][a-zA-Z0-9_ÇŞĞÜÖİçşğüöı]*)\b', kod)
-    tanimlar.update(self_degiskenler)
-    
-    # Parametre isimleri: fonksiyon isim(param1, param2):
-    parametreler = re.findall(r'\bfonksiyon\s+[a-zA-Z_][a-zA-Z0-9_ÇŞĞÜÖİçşğüı]*\s*\(([^)]*)\)', kod)
-    for param_grup in parametreler:
-        for param in param_grup.split(','):
-            param = param.strip().split('=')[0].strip()  # Varsayılan değeri at
-            if param and param != 'self':
-                tanimlar.add(param)
-    
-    return sorted(list(tanimlar))
-def _tamamlama_kelime_listesi_al(self):
-    """Otomatik tamamlama için kelime listesini oluştur (sözlük + kod içi tanımlar)"""
-    # 1. Sabit sözlük kelimeleri
-    sabit_kelimeler = set(TURKCE_KELIMELER)
-    
-    # 2. Kod içi tanımlar
-    mevcut_kod = self.kod_alani.get("1.0", "end-1c")
-    kod_tanimlari = set(self._koddan_tanimlari_cikar(mevcut_kod))
-    
-    # 3. Birleştir (kod tanımları önce gelsin)
-    tum_kelimeler = list(kod_tanimlari) + [k for k in sabit_kelimeler if k not in kod_tanimlari]
-    
-    return tum_kelimeler
 # Turkce-Python referans listesi (AI icin dahili kullanim, ayarlarda gorunmez)
 # ============ PYTHON'DAN TÜRKOD'A ÇEVİRİ ============
 # ============ SOZLUK (Turkish to Python) ============
@@ -393,25 +352,38 @@ TERS_SOZLUK = _ters_sozluk_olustur()
 
 # ============ PYTHON'DAN TÜRKOD'A ÇEVİRİ ============
 def python_kodu_turkceye_cevir(python_kodu):
-    """Python kodunu TürKod'a çevir"""
     saklanan_metinler = []
-
     def sakla(match):
-        saklanan_metinler.append(match.group(0))
-        return f"__METIN_SABITI_{len(saklanan_metinler)-1}__"
-
+        uid = uuid.uuid4().hex[:12]
+        saklanan_metinler.append((uid, match.group(0)))
+        return f"\x00METIN_{uid}\x00"
     string_ve_yorum = r'("(?:[^"\\]|\\.)*"|\'(?:[^\'\\]|\\.)*\'|#.*)'
     gecici_kod = re.sub(string_ve_yorum, sakla, python_kodu)
 
-    # Uzunluk sırasına göre sırala (çakışma önleme)
-    sirali = sorted(TERS_SOZLUK.items(), key=lambda x: len(x[0]), reverse=True)
+    PY_ID = r'[A-Za-z_][A-Za-z0-9_]*'
+    tanimlar = set()
+    tanimlar.update(re.findall(rf'^\s*({PY_ID})\s*=(?!=)', gecici_kod, re.MULTILINE))
+    tanimlar.update(re.findall(rf'\bfor\s+({PY_ID})\s+in\b', gecici_kod))
+    tanimlar.update(re.findall(rf'\bself\.({PY_ID})', gecici_kod))
+    for param_blok in re.findall(rf'\bdef\s+{PY_ID}\s*\(([^)]*)\)', gecici_kod):
+        for p in param_blok.split(','):
+            p = p.strip().split('=')[0].strip()
+            if p and p != 'self':
+                tanimlar.add(p)
 
-    for py_kelime, tr_kelime in sirali:
+    isim_sak = {}
+    for isim in sorted(tanimlar, key=len, reverse=True):
+        yer = f"__ISIM_SABITI_{len(isim_sak)}__"
+        isim_sak[yer] = isim
+        gecici_kod = re.sub(rf'\b{re.escape(isim)}\b', yer, gecici_kod)
+
+    for py_kelime, tr_kelime in sorted(TERS_SOZLUK.items(), key=lambda x: len(x[0]), reverse=True):
         gecici_kod = re.sub(rf'\b{re.escape(py_kelime)}\b', tr_kelime, gecici_kod)
 
-    for i, metin in enumerate(saklanan_metinler):
-        gecici_kod = gecici_kod.replace(f"__METIN_SABITI_{i}__", metin)
-
+    for uid, metin in saklanan_metinler:
+        gecici_kod = gecici_kod.replace(f"\x00METIN_{uid}\x00", metin)
+    for yer, isim in isim_sak.items():
+        gecici_kod = gecici_kod.replace(yer, isim)
     return gecici_kod
 # ============ AI PROVIDER IMPORTS (optional) ============
 try:
@@ -451,9 +423,9 @@ class AyarlarYoneticisi:
             "ai_model": "gpt-4o-mini",
             "ai_api_key": "",
            "ai_sistem_mesaji": """Sen bir Python kodlama asistanisin. Kullanici TürKod (Türkçe'ye çevrilmiş özel Python) yazıyor.
-            Sen ise Python kodu yazdığında program onu çevirerek kullanıcıya doğru olanı gösteriyor bu yüzden Python kodu yazmalısın.
+            Sen ise Python değil ``` python ``` arasına Python yaz.
             KURALLAR:
-            - Kod verirken MUTLAKA ```TürKod ve ``` arasina yaz.
+            - Kod verirken MUTLAKA ```python ve ``` arasina yaz.
             - Aciklama kismi duz metin, kod kismi ayri blok olmali.
             -Sadece Python kodları ver başka bir dil kullanamazsın.
             """,
@@ -545,62 +517,23 @@ TEMA_RENKLERI = {
     }
 }
 
-# ============ SOZLUK (Turkish to Python) ============
-def _sozluk_yukle(dosya_adi="TurKod_Sozluk.txt"):
-    """
-    TürKod sözlüğünü yükle.
-    .exe'de sys._MEIPASS'ten, .py'de script dizininden okur.
-    """
-    try:
-        # 1. PyInstaller .exe'de sys._MEIPASS kullan
-        if getattr(sys, 'frozen', False):
-            base_path = sys._MEIPASS
-        else:
-            # Normal Python çalışması - scriptin bulunduğu dizin
-            base_path = os.path.dirname(os.path.abspath(__file__))
-        
-        yol = os.path.join(base_path, dosya_adi)
-        
-        # 2. Yoksa çalışma dizinine bak
-        if not os.path.exists(yol):
-            yol = os.path.join(os.getcwd(), dosya_adi)
-        
-        # 3. Hala yoksa dosya adıyla dene (mevcut dizin)
-        if not os.path.exists(yol):
-            yol = dosya_adi
-        
-        if not os.path.exists(yol):
-            print(f"[TurKod] Sözlük dosyası bulunamadı: {dosya_adi}")
-            return {}
-        
-        with open(yol, "r", encoding="utf-8") as f:
-            icerik = f.read()
-        
-        bas = icerik.find("{")
-        son = icerik.rfind("}") + 1
-        if bas != -1 and son > bas:
-            return ast.literal_eval(icerik[bas:son])
-            
-    except Exception as e:
-        print(f"[TurKod] Sözlük yüklenemedi: {e}")
-    
-    return {}
-
-SOZLUK = _sozluk_yukle()
-
-if not SOZLUK:
-    print("[TurKod] UYARI: Sözlük dosyası bulunamadı!")
     
 # ============ KELIME LISTESI (Otomatik Tamamlama Icin) ============
 def sozlukten_kelime_listesi():
     """SOZLUK'ten temiz Türkçe kelime listesi çıkar - önbellekli"""
     cache_dosya = os.path.join(os.path.expanduser("~"), ".turkod_kelimeler.json")
-    
-    if os.path.exists(cache_dosya):
+    sozluk_yolu = None
+    for aday in (os.path.join(os.path.dirname(os.path.abspath(__file__)), "TurKod_Sozluk.txt"),
+                 os.path.join(os.getcwd(), "TurKod_Sozluk.txt")):
+        if os.path.exists(aday):
+            sozluk_yolu = aday
+            break
+    if os.path.exists(cache_dosya) and (sozluk_yolu is None or
+            os.path.getmtime(cache_dosya) >= os.path.getmtime(sozluk_yolu)):
         try:
             with open(cache_dosya, "r", encoding="utf-8") as f:
                 return json.load(f)
-        except:
+        except Exception:
             pass
     
     kelimeler = set()
@@ -640,10 +573,10 @@ AI_MODELLERI = {
 
 # ============ OTOMATIK MODEL GUNCELLEME ============
 def _modelleri_guncelle():
-    import requests
     
     try:
-        resp = requests.get("[https://api.groq.com/openai/v1/models](https://api.groq.com/openai/v1/models)", timeout=8)
+        import requests
+        resp = requests.get("https://api.groq.com/openai/v1/models", timeout=8)
         if resp.status_code == 200:
             modeller = [m["id"] for m in resp.json().get("data", [])]
             modeller = [m for m in modeller if "whisper" not in m.lower()]
@@ -654,7 +587,7 @@ def _modelleri_guncelle():
         print(f"[TurKod] Groq guncelleme hatasi: {e}")
     
     try:
-        resp = requests.get("[https://api.openai.com/v1/models](https://api.openai.com/v1/models)", timeout=8)
+        resp = requests.get("https://api.openai.com/v1/models", timeout=10)
         if resp.status_code == 200:
             modeller = [m["id"] for m in resp.json().get("data", [])]
             modeller = [m for m in modeller if "gpt" in m.lower()]
@@ -668,33 +601,109 @@ threading.Thread(target=_modelleri_guncelle, daemon=True).start()
 
 
 def turkce_kodu_donustur(turkce_kod):
+    # 1) Önce string ve yorumları sakla
     saklanan_metinler = []
-
     def sakla(match):
         saklanan_metinler.append(match.group(0))
         return f"__METIN_SABITI_{len(saklanan_metinler)-1}__"
-
     string_ve_yorum = r'("(?:[^"\\]|\\.)*"|\'(?:[^\'\\]|\\.)*\'|#.*)'
     gecici_kod = re.sub(string_ve_yorum, sakla, turkce_kod)
 
+    # 2) tkinter API çevirileri (nokta-bazlı; korumadan ÖNCE çalışmalı)
+    TK_CEVIRILERI = [
+        # import
+        (r"\bice_aktar\s+tkinter_arayuz\s+olarak\s+([A-Za-z_][A-Za-z0-9_]*)\b", r"import tkinter as \1"),
+        (r"\bice_aktar\s+tkinter_arayuz\b", "import tkinter"),
+        # sınıflar ve metotlar (nokta-bazlı: değişken adlarına dokunmaz)
+        (r"\.pencere\b", ".Tk"),
+        (r"\.etiket\b", ".Label"),
+        (r"\.dugme\b", ".Button"),
+        (r"\.metin_kutusu\b", ".Entry"),
+        (r"\.metin_alani\b", ".Text"),
+        (r"\.cerceve\b", ".Frame"),
+        (r"\.liste_kutusu\b", ".Listbox"),
+        (r"\.yeni_pencere\b", ".Toplevel"),
+        (r"\.canvas\b", ".Canvas"),
+        (r"\.scrollbar\b", ".Scrollbar"),
+        (r"\.spinbox\b", ".Spinbox"),
+        (r"\.checkbutton\b", ".Checkbutton"),
+        (r"\.radiobutton\b", ".Radiobutton"),
+        (r"\.menu\b", ".Menu"),
+        (r"\.baslik_grafik\b", ".title"),
+        (r"\.getir\b", ".get"),
+        (r"\.yok_et\b", ".destroy"),
+        (r"\.ana_dongu\b", ".mainloop"),
+        (r"\.yerlestir\b", ".place"),
+        (r"\.boyutlandir\b", ".geometry"),
+        # parametre adları (sadece çağrı içindeyken: önünde , veya ( varken)
+        (r"([,(]\s*)xml_metin\s*=", r"\1text="),
+        (r"([,(]\s*)komut\s*=", r"\1command="),
+        (r"([,(]\s*)degisken\s*=", r"\1variable="),
+    ]
+    for desen, hedef in TK_CEVIRILERI:
+        gecici_kod = re.sub(desen, hedef, gecici_kod)
+
+    # 3) Kullanıcı tanımlı isimleri sözlükten koru
+    #    NOT: fonksiyon adları ve parametreler KORUNMAZ;
+    #    baslat_ozel -> __init__, kendisi -> self gibi çeviriler çalışmalı.
+    TR_ID = r'[A-Za-z_ÇŞĞÜÖİçşğüöı][A-Za-z0-9_ÇŞĞÜÖİçşğüöı]*'
+    tanimlar = set()
+        # Atama hedefleri (parantez derinliği farkındalıklı):
+    # açık parantez içindeki devam satırlarında başlayan kwarg'ları atama sanma
+    derinlik = 0
+    for satir in gecici_kod.split("\n"):
+        if derinlik == 0:
+            m = re.match(rf'\s*({TR_ID})\s*=(?!=)', satir)
+            if m:
+                tanimlar.add(m.group(1))
+        derinlik += satir.count("(") + satir.count("[") + satir.count("{")
+        derinlik -= satir.count(")") + satir.count("]") + satir.count("}")
+        if derinlik < 0:
+            derinlik = 0
+    tanimlar.update(re.findall(rf'\bsinif\s+({TR_ID})', gecici_kod))
+    tanimlar.update(re.findall(rf'\bdongu\s+({TR_ID})\s+icinde', gecici_kod))
+    tanimlar.update(re.findall(rf'\bself\.({TR_ID})', gecici_kod))
+    tanimlar.update(re.findall(rf'\bkendisi\.({TR_ID})', gecici_kod))
+
+    isim_sak = {}
+    for isim in sorted(tanimlar, key=len, reverse=True):
+        yer = f"__ISIM_SABITI_{len(isim_sak)}__"
+        isim_sak[yer] = isim
+        gecici_kod = re.sub(rf'\b{re.escape(isim)}\b', yer, gecici_kod)
+
+    # 4) Modül import çevirileri
+    MODUL_CEVIRILERI = {
+        "matematik": "math",
+        "rastgele": "random",
+        "tarih_saat": "datetime",
+        "isletim_sistemi": "os",
+        "sistem": "sys",
+        "json": "json",
+        "desen": "re",
+    }
+    for tr_modul, py_modul in MODUL_CEVIRILERI.items():
+        gecici_kod = re.sub(
+            rf"\bice_aktar\s+{tr_modul}\b",
+            f"import {py_modul}",
+            gecici_kod
+        )
     python_kodu = re.sub(
         r"\bice_aktar\s+([a-zA-Z0-9_]+)\s+den\s+([a-zA-Z0-9_]+)\b",
         r"from \2 import \1",
         gecici_kod
     )
-
     python_kodu = re.sub(
         r"\bden\s+([a-zA-Z0-9_]+)\s+ice_aktar\s+([a-zA-Z0-9_]+)\b",
         r"from \1 import \2",
         python_kodu
     )
-
     python_kodu = re.sub(
         r"\bdongu\s+(.*?)\s+icinde\s+(.*?):",
         r"for \1 in \2:",
         python_kodu
     )
 
+    # 5) Modül metot çevirileri (matematik.karekok -> math.sqrt vb.)
     MODUL_METOTLARI = {
         "rastgele": {
             "sec": "choice", "tamsayi": "randint", "ondalik": "random",
@@ -726,25 +735,28 @@ def turkce_kodu_donustur(turkce_kod):
             "sinus_h": "sinh", "tanjant_h": "tanh", "kirp_sifir": "trunc", "sonraki_ulp": "ulp",
         },
         "tarih_saat": {
-            "simdi": "now", "bugun": "today", "zaman_farki": "timedelta",
-            "tarih_bicimlendir": "strftime", "tarih_ayristir": "strptime",
-            "zaman_damgasi": "timestamp", "haftanin_gunu": "weekday",
-            "tarih": "date", "zaman": "time", "saat_dilimi": "timezone",
-            "dilim_bilgisi": "tzinfo", "iso_format": "isoformat",
-            "iso_ayristir": "fromisoformat", "metin_zaman": "ctime",
-            "yer_degistir": "replace", "utc_simdi": "utcnow",
-            "utc_damgasi": "utcfromtimestamp", "damga_zaman": "fromtimestamp",
-            "tarih_birlestir": "combine", "en_kucuk_tarih": "min",
-            "en_buyuk_tarih": "max", "cozunurluk": "resolution",
-        }
+            "simdi": "datetime.now", "bugun": "datetime.today",
+            "utc_simdi": "datetime.utcnow",
+            "utc_damgasi": "datetime.utcfromtimestamp",
+            "damga_zaman": "datetime.fromtimestamp",
+            "iso_ayristir": "datetime.fromisoformat",
+            "tarih_birlestir": "datetime.combine",
+            "tarih_ayristir": "datetime.strptime",
+            "en_buyuk_tarih": "datetime.max",
+            "en_kucuk_tarih": "datetime.min",
+            "zaman_farki": "timedelta", "tarih": "date", "zaman": "time",
+            "saat_dilimi": "timezone", "dilim_bilgisi": "tzinfo",
+            "cozunurluk": "timedelta.resolution",
+            "tarih_bicimlendir": "strftime", "zaman_damgasi": "timestamp",
+            "haftanin_gunu": "weekday", "iso_format": "isoformat",
+            "metin_zaman": "ctime", "yer_degistir": "replace",
+        },
     }
-
     MODUL_ISIMLERI = {
         "rastgele": "random",
         "matematik": "math",
         "tarih_saat": "datetime"
     }
-
     for modul, metotlar in MODUL_METOTLARI.items():
         py_modul = MODUL_ISIMLERI[modul]
         for tr_metot, py_metot in metotlar.items():
@@ -754,12 +766,15 @@ def turkce_kodu_donustur(turkce_kod):
                 python_kodu
             )
 
-    for turkce, python_karsiligi in SOZLUK.items():
+    # 6) Genel sözlük (uzun desenler önce: çakışma önleme)
+    for turkce, python_karsiligi in sorted(SOZLUK.items(), key=lambda x: len(x[0]), reverse=True):
         python_kodu = re.sub(turkce, python_karsiligi, python_kodu)
 
+    # 7) Saklananları geri koy
     for i, metin in enumerate(saklanan_metinler):
         python_kodu = python_kodu.replace(f"__METIN_SABITI_{i}__", metin)
-
+    for yer, isim in isim_sak.items():
+        python_kodu = python_kodu.replace(yer, isim)
     return python_kodu
 
 
@@ -786,6 +801,14 @@ HATA_MESAJLARI = {
     r"division by zero": "Bir sayı 0'a bolunemez!",
     r"list index out of range": "Listenin sınırları dışında bir elemana ulaşmaya çalıştınız!"
 }
+
+import builtins
+_gercek_input = builtins.input
+def _input(prompt=""):
+    sys.stdout.write(str(prompt))
+    sys.stdout.flush()
+    return _gercek_input()
+builtins.input = _input
 
 try:
     with open("turkce_kod_calisma.py", "r", encoding="utf-8") as f:
@@ -818,6 +841,8 @@ except Exception as e:
 class TurkceIDE(ctk.CTk):
     def __init__(self):
         super().__init__()
+        # === DEBUGGER ===
+        self.debugger = BasitDebugger(self)
         self.withdraw()
         self.ayarlar = AyarlarYoneticisi()
         self.tema = self.ayarlar.get("tema")
@@ -850,6 +875,7 @@ class TurkceIDE(ctk.CTk):
         self.after(100, self._ornek_kod_yukle)
         self._otomatik_kaydetme_baslat()
         self.after(200, self._pencere_goster)
+        self.protocol("WM_DELETE_WINDOW", self._pencere_kapat)
         self._kod_tanimlari_cache = []
         self._calistirma_process = None
         self._son_kod_hash = ""
@@ -874,6 +900,8 @@ class TurkceIDE(ctk.CTk):
         
         # self.degisken atamaları
         self_degiskenler = re.findall(r'\bself\.([a-zA-Z_][a-zA-Z0-9_ÇŞĞÜÖİçşğüöı]*)\b', kod)
+        kendisi_degiskenler = re.findall(r'\bkendisi\.([a-zA-Z_][a-zA-Z0-9_ÇŞĞÜÖİçşğüöı]*)\b', kod)
+        tanimlar.update(kendisi_degiskenler)
         tanimlar.update(self_degiskenler)
         
         # Parametre isimleri: fonksiyon isim(param1, param2):
@@ -903,11 +931,12 @@ class TurkceIDE(ctk.CTk):
     def _pencere_goster(self):
         self.deiconify()
         self.update_idletasks()
+        self._sekme_layout_guncelle()
         
     def _arayuz_olustur(self):
         # === AKTIVITE BAR (sol en dar) ===
         self.activity_bar = ctk.CTkFrame(self, width=48, fg_color=self.colors["activity_bar"])
-        self.activity_bar.grid(row=0, column=0, rowspan=3, sticky="nsew")
+        self.activity_bar.grid(row=0, column=0, rowspan=5, sticky="nsew")
         self.activity_bar.grid_propagate(False)
 
         # Explorer butonu 
@@ -944,7 +973,7 @@ class TurkceIDE(ctk.CTk):
 
         # === SIDEBAR (Dosya Gezgini) ===
         self.sidebar = ctk.CTkFrame(self, width=220, fg_color=self.colors["sidebar"])
-        self.sidebar.grid(row=0, column=1, rowspan=3, sticky="nsew", padx=(0, 0))
+        self.sidebar.grid(row=0, column=1, rowspan=5, sticky="nsew", padx=(0, 0))
         self.sidebar.grid_propagate(False)
 
         self.sidebar_title = ctk.CTkLabel(self.sidebar, text="GEZGİN", font=("Segoe UI", 9, "bold"),
@@ -997,52 +1026,72 @@ class TurkceIDE(ctk.CTk):
         )
 
         self.dosya_tree.bind("<Double-1>", self._dosya_tree_cift_tik)
+        self.dosya_tree.bind("<<TreeviewOpen>>", self._tree_acildi)
 
         # === TAB BAR ===
         self.tab_bar = ctk.CTkFrame(self, height=38, fg_color=self.colors["tab_inactive"])
         self.tab_bar.grid(row=0, column=3, sticky="ew")
         self.tab_bar.grid_propagate(False)
         self.tab_bar.grid_columnconfigure(0, weight=1)
+        self.tab_bar.grid_rowconfigure(0, weight=1)
 
-        self.sekmeler_container = ctk.CTkFrame(self.tab_bar, fg_color="transparent", height=38)
-        self.sekmeler_container.grid(row=0, column=0, sticky="w")
-        self.sekmeler_container.grid_propagate(False)
+        # Taşma okları (gereksizse gizlenir)
+        self.tab_left_btn = ctk.CTkButton(self.tab_bar, text="‹", width=22, corner_radius=0,
+            fg_color="transparent", hover_color=self.colors["tab_active"],
+            text_color=self.colors["text"], command=lambda: self._sekme_kaydir(120))
+        self.tab_right_btn = ctk.CTkButton(self.tab_bar, text="›", width=22, corner_radius=0,
+            fg_color="transparent", hover_color=self.colors["tab_active"],
+            text_color=self.colors["text"], command=lambda: self._sekme_kaydir(-120))
 
+        # Sekme şeridi (kaydırılabilir alan)
+        self.tab_strip = ctk.CTkFrame(self.tab_bar, fg_color="transparent", height=38)
+        self.tab_strip.grid(row=0, column=0, sticky="nsew")
+        self.tab_strip.grid_propagate(False)
+        self.tab_strip.bind("<MouseWheel>", self._sekme_wheel)
+        self.tab_strip.bind("<Button-4>", lambda e: self._sekme_kaydir(120))
+        self.tab_strip.bind("<Button-5>", lambda e: self._sekme_kaydir(-120))
+
+        self.sekmeler_container = ctk.CTkFrame(self.tab_strip, fg_color="transparent",
+                                       height=38, width=176)
+        self.sekmeler_container.pack_propagate(False)
+        self.sekmeler_container.place(x=0, y=0, relheight=1.0)
+        self._sekme_offset = 0
+        self._sekme_genisligi = 170
+
+        # Butonlar artık ayrı sütunda, sekmelerle çakışamaz
         self.tab_buttons = ctk.CTkFrame(self.tab_bar, fg_color="transparent")
-        self.tab_buttons.grid(row=0, column=1, sticky="e", padx=10)
-
+        self.tab_buttons.grid(row=0, column=3, sticky="e", padx=(5, 10))
         self.yeni_sekme_btn = ctk.CTkButton(self.tab_buttons, text="＋", width=30, height=26,
-                                             command=self._yeni_sekme_olustur,
-                                             fg_color=self.colors["button_bg"],
-                                             hover_color=self.colors["button_hover"],
-                                             border_color=self.colors["border"],
-                                             border_width=2,
-                                             font=("Segoe UI", 14, "bold"), corner_radius=8)
+            command=self._yeni_sekme_olustur, fg_color=self.colors["button_bg"],
+            hover_color=self.colors["button_hover"], border_color=self.colors["border"],
+            border_width=2, font=("Segoe UI", 14, "bold"), corner_radius=8)
         self.yeni_sekme_btn.pack(side="left", padx=3)
 
         self.calistir_btn = ctk.CTkButton(self.tab_buttons, text="▶  Çalıştır", width=90, height=26,
-                                           command=self.kodu_calistir, fg_color="#28a745",
-                                           border_color=self.colors["border"],
-                                           border_width=2,
-                                           hover_color="#218838", font=("Segoe UI", 14),
-                                           corner_radius=8)
+            command=self.kodu_calistir, fg_color="#28a745", border_color=self.colors["border"],
+            border_width=2, hover_color="#218838", font=("Segoe UI", 14), corner_radius=8)
         self.calistir_btn.pack(side="left", padx=3)
 
         self.ac_btn = ctk.CTkButton(self.tab_buttons, text="📂 Aç", width=60, height=26,
-                                     command=self.dosya_ac, fg_color=self.colors["button_bg"],
-                                     hover_color=self.colors["button_hover"],
-                                     border_color=self.colors["border"],
-                                     border_width=2,
-                                     font=("Segoe UI ", 14), corner_radius=8)
+            command=self.dosya_ac, fg_color=self.colors["button_bg"],
+            hover_color=self.colors["button_hover"], border_color=self.colors["border"],
+            border_width=2, font=("Segoe UI", 14), corner_radius=8)
         self.ac_btn.pack(side="left", padx=3)
 
         self.kaydet_btn = ctk.CTkButton(self.tab_buttons, text="📃 Kaydet", width=70, height=26,
-                                         command=self.dosya_kaydet, fg_color=self.colors["button_bg"],
-                                         hover_color=self.colors["button_hover"],
-                                         border_color=self.colors["border"],
-                                         border_width=2,
-                                         font=("Segoe UI", 14), corner_radius=8)
+            command=self.dosya_kaydet, fg_color=self.colors["button_bg"],
+            hover_color=self.colors["button_hover"], border_color=self.colors["border"],
+            border_width=2, font=("Segoe UI", 14), corner_radius=8)
         self.kaydet_btn.pack(side="left", padx=3)
+
+        self.cevir_btn = ctk.CTkButton(self.tab_buttons, text="⇄ Çevir", width=70, height=26,
+            command=self._kodu_cevir, fg_color=self.colors["button_bg"],
+            hover_color=self.colors["button_hover"], border_color=self.colors["border"],
+            border_width=2, font=("Segoe UI", 14), corner_radius=8)
+        self.cevir_btn.pack(side="left", padx=3)
+        
+
+        self.tab_bar.bind("<Configure>", lambda e: self._sekme_layout_guncelle())
         
         # === EDITOR FRAME ===
         self.editor_frame = ctk.CTkFrame(self, fg_color=self.colors["bg"])
@@ -1065,7 +1114,8 @@ class TurkceIDE(ctk.CTk):
             self.editor_frame,
             font=(self.ayarlar.get("yazi_tipi"), self.ayarlar.get("yazi_boyutu")),
             corner_radius=0, fg_color=self.colors["bg"], text_color=self.colors["text"],
-            wrap="none" if not self.ayarlar.get("kelime_sar") else "word"
+            wrap="none" if not self.ayarlar.get("kelime_sar") else "word",
+            undo=True, maxundo=100
         )
         self.kod_alani.grid(row=0, column=1, sticky="nsew", padx=(2, 0))
         
@@ -1081,7 +1131,7 @@ class TurkceIDE(ctk.CTk):
 
         # === AI PANEL (sağ) ===
         self.ai_panel = ctk.CTkFrame(self, width=480, fg_color=self.colors["ai_panel"])
-        self.ai_panel.grid(row=0, column=5, rowspan=3, sticky="nsew")
+        self.ai_panel.grid(row=0, column=5, rowspan=5, sticky="nsew")
         self.ai_panel.grid_propagate(False)
         self.ai_panel_visible = True
 
@@ -1161,10 +1211,13 @@ class TurkceIDE(ctk.CTk):
             ctk.CTkButton(self.ai_aksiyonlar, text=text, width=70, height=26,
                           fg_color=self.colors["button_bg"], hover_color=self.colors["button_hover"],
                           font=("Segoe UI", 10), command=cmd).pack(side="left", padx=2)
-                          
+            
+        ctk.CTkButton(self.ai_aksiyonlar, text="📝 TODO", width=70, height=26,
+                      fg_color=self.colors["button_bg"], hover_color=self.colors["button_hover"],
+                      font=("Segoe UI", 10), command=self._todo_panel_ac).pack(side="left", padx=2)                          
         # === STATUS BAR ===
         self.status_bar = ctk.CTkFrame(self, height=24, fg_color=self.colors["status_bar"])
-        self.status_bar.grid(row=2, column=3, sticky="ew")
+        self.status_bar.grid(row=4, column=3, sticky="ew")
         self.status_bar.grid_propagate(False)
 
         self.status_left = ctk.CTkLabel(self.status_bar,
@@ -1172,11 +1225,64 @@ class TurkceIDE(ctk.CTk):
                                          font=("Segoe UI", 9, "bold"), text_color="white")
         self.status_left.place(rely=0.5, anchor="w")
 
-        self.status_right = ctk.CTkLabel(self.status_bar,
-                                          text="UTF-8 | TRPY ",
-                                          font=("Segoe UI", 9, "bold"), text_color="white")
-        self.status_right.place(relx=1.0, rely=0.5, anchor="e")
+        # Sağ grup: istatistik butonu + dosya bilgisi yan yana
+        self.status_right_frame = ctk.CTkFrame(self.status_bar, fg_color="transparent")
+        self.status_right_frame.place(relx=1.0, rely=0.5, anchor="e")
 
+        self.stats_btn = ctk.CTkButton(self.status_right_frame, text="📊", width=26, height=20,
+            fg_color="transparent", hover_color="#1177bb",
+            text_color="white", corner_radius=4,
+            font=("Segoe UI", 10), command=self._istatistik_goster)
+        self.stats_btn.pack(side="left", padx=(0, 6))
+
+        self.status_right = ctk.CTkLabel(self.status_right_frame,
+            text="UTF-8 | TRPY ",
+            font=("Segoe UI", 9, "bold"), text_color="white")
+        self.status_right.pack(side="left")
+
+        # === ENTEGRE TERMİNAL ===
+        self.terminal_visible = False
+        self.terminal_frame = ctk.CTkFrame(self, height=220, fg_color=self.colors["panel_bg"])
+        self.terminal_frame.grid_propagate(False)
+        # --- Üstten yeniden boyutlandırma çizgisi ---
+        self.terminal_grip = tk.Frame(
+            self.terminal_frame,
+            bg=self.colors["border"],
+            height=6,
+            cursor="sb_v_double_arrow"
+        )
+        self.terminal_grip.pack(fill="x", side="top")
+        self.terminal_grip.bind("<Button-1>", self._terminal_grip_basla)
+        self.terminal_grip.bind("<B1-Motion>", self._terminal_grip_surukle)
+        self.terminal_grip.bind("<ButtonRelease-1>", self._terminal_grip_birak)
+        # Başlangıçta gizli; _terminal_toggle ile açılır
+
+        term_header = ctk.CTkFrame(self.terminal_frame, fg_color=self.colors["sidebar"], height=28)
+        term_header.pack(fill="x", side="top")
+        term_header.pack_propagate(False)
+        ctk.CTkLabel(term_header, text="  TERMİNAL", font=("Segoe UI", 9, "bold"),
+                     text_color=self.colors["panel_fg"]).pack(side="left", padx=8)
+        ctk.CTkButton(term_header, text="🗑", width=26, height=22, fg_color="transparent",
+                      hover_color="#c75450", text_color=self.colors["text"],
+                      command=self._terminal_temizle).pack(side="right", padx=2)
+        ctk.CTkButton(term_header, text="×", width=26, height=22, fg_color="transparent",
+                      hover_color="#c75450", text_color=self.colors["text"],
+                      command=self._terminal_toggle).pack(side="right", padx=2)
+
+        self.terminal_output = ctk.CTkTextbox(
+            self.terminal_frame, font=("Consolas", 10),
+            fg_color=self.colors["bg"], text_color=self.colors["text"],
+            corner_radius=0, state="disabled"
+        )
+        self.terminal_output.pack(fill="both", expand=True, padx=2, pady=(2, 0))
+
+        self.terminal_input = ctk.CTkEntry(
+            self.terminal_frame, font=("Consolas", 11), height=28,
+            fg_color=self.colors["ai_input"], text_color=self.colors["text"],
+            border_color=self.colors["border"]
+        )
+        self.terminal_input.pack(fill="x", padx=2, pady=2)
+        self.terminal_input.bind("<Return>", self._terminal_enter)
         # === AYARLAR BUTONU (sol alt) ===
         self.ayarlar_btn = ctk.CTkButton(self.activity_bar, text="⚙", width=36, height=36,
                                           fg_color="transparent", 
@@ -1188,9 +1294,306 @@ class TurkceIDE(ctk.CTk):
                                           command=self._ayarlar_penceresi_ac)
         self.ayarlar_btn.pack(side="bottom", pady=15)
         self._grip_olustur()
+        self.fold_regions = {}  # {satir_no: (bas_idx, bit_idx, collapsed)}
+        self.fold_indicators = {}  # Satır numaralarındaki fold ikonları
+        self.fold_states = {}
         self.renk_ayarlarini_yap()
+        self._tree_tagleri_ayarla()
         if self.proje_dizini and os.path.exists(self.proje_dizini):
             self.after(200, self._dosya_tree_guncelle)
+    def _tree_acildi(self, event=None):
+        """Ok işaretine tek tıkla açılan klasörleri de senkron doldur"""
+        try:
+            item = self.dosya_tree.focus()
+            if not item:
+                return
+
+            values = self.dosya_tree.item(item, "values")
+            if not values or len(values) < 2 or values[1] != "directory":
+                return
+
+            durum = values[2] if len(values) > 2 else "collapsed"
+            if durum != "collapsed":
+                return  # zaten yüklü, tekrar doldurma
+
+            # "⏳ Yükleniyor..." dummy'sini temizle, gerçek içeriği koy
+            for child in self.dosya_tree.get_children(item):
+                self.dosya_tree.delete(child)
+
+            self._tree_doldur(values[0], item)
+            self.dosya_tree.item(item, values=(values[0], "directory", "expanded"))
+        except Exception:
+            pass
+    def _istatistik_goster(self, event=None):
+        """Kod istatistiklerini göster"""
+        kod = self.kod_alani.get("1.0", "end-1c")
+        satirlar = kod.split('\n')
+        
+        toplam_satir = len(satirlar)
+        bos_satir = sum(1 for s in satirlar if not s.strip())
+        yorum_satir = sum(1 for s in satirlar if s.strip().startswith('#'))
+        kod_satir = toplam_satir - bos_satir - yorum_satir
+        karakter = len(kod)
+        karakter_bosluksuz = len(kod.replace(' ', '').replace('\n', '').replace('\t', ''))
+        
+        import re
+        fonksiyon_sayisi = len(re.findall(r'\bfonksiyon\s+\w+', kod))
+        sinif_sayisi = len(re.findall(r'\bsinif\s+\w+', kod))
+        degisken_sayisi = len(set(re.findall(r'^([a-zA-Z_çğıöşüÇĞİÖŞÜ][a-zA-Z0-9_çğıöşüÇĞİÖŞÜ]*)\s*=', kod, re.MULTILINE)))
+        
+        mesaj = f"""📊 Kod İstatistikleri
+
+    Toplam Satır: {toplam_satir}
+      ├─ Kod Satırı: {kod_satir}
+      ├─ Yorum Satırı: {yorum_satir}
+      └─ Boş Satır: {bos_satir}
+
+    Karakter: {karakter} (boşluksuz: {karakter_bosluksuz})
+
+    Fonksiyon: {fonksiyon_sayisi}
+    Sınıf: {sinif_sayisi}
+    Değişken: {degisken_sayisi}"""
+        
+        messagebox.showinfo("Kod İstatistikleri", mesaj)
+    # ============ SEKME ŞERİDİ YÖNETİMİ ============
+    def _sekme_wheel(self, event):
+        self._sekme_kaydir(120 if event.delta > 0 else -120)
+        return "break"
+
+    def _sekme_kaydir(self, delta):
+        gorunur = self.tab_strip.winfo_width()
+        icerik = self.sekmeler_container.winfo_width()
+        min_offset = min(0, gorunur - icerik)
+        self._sekme_offset = max(min_offset, min(0, self._sekme_offset + delta))
+        self.sekmeler_container.place_configure(x=self._sekme_offset)
+        self._sekme_ok_guncelle()
+
+    def _sekme_ok_guncelle(self):
+        gorunur = self.tab_strip.winfo_width()
+        icerik = self.sekmeler_container.winfo_width()
+        if icerik > gorunur - 4:
+            self.tab_left_btn.grid(row=0, column=1, sticky="ns")
+            self.tab_right_btn.grid(row=0, column=2, sticky="ns")
+        else:
+            self.tab_left_btn.grid_remove()
+            self.tab_right_btn.grid_remove()
+            self._sekme_offset = 0
+            self.sekmeler_container.place_configure(x=0)
+
+    def _sekme_layout_guncelle(self):
+        """Chrome gibi: sekme sayısına göre genişlik hesapla"""
+        gorunur = self.tab_strip.winfo_width()
+        n = len(self.sekmeler)
+        
+        # Sekme kalmadıysa bölme hatasını önlemek için konteyneri sıfırla ve çık
+        if n == 0:
+            self.sekmeler_container.configure(width=0)
+            self._sekme_ok_guncelle()
+            return
+
+        if gorunur < 50:
+            # Pencere henüz haritalanmadı; biraz sonra tekrar dene
+            try:
+                self.after(50, self._sekme_layout_guncelle)
+            except Exception:
+                pass
+            return
+            
+        min_w, max_w = 90, 170
+        genislik = min(max_w, max(min_w, (gorunur - 8) // n))
+        self._sekme_genisligi = genislik
+        
+        for s in self.sekmeler:
+            s["frame"].configure(width=genislik)
+            self._sekme_etiket_kirp(s, genislik)
+            
+        self.sekmeler_container.configure(width=n * (genislik + 2) + 4)
+        self._sekme_ok_guncelle()
+
+    def _sekme_etiket_kirp(self, sekme, genislik):
+        isim = sekme["isim"]
+        if sekme["degisti"]:
+            isim += " ●"
+        max_karakter = max(4, (genislik - 46) // 7)
+        if len(isim) > max_karakter:
+            isim = isim[:max_karakter - 1] + "…"
+        sekme["label"].configure(text=isim)
+    def _todo_panel_ac(self):
+        """TODO/FIXME/HACK yorumlarını listeleyen panel aç"""
+        if hasattr(self, '_todo_pencere') and self._todo_pencere.winfo_exists():
+            self._todo_pencere.lift()
+            return
+        
+        pencere = ctk.CTkToplevel(self)
+        pencere.title("TODO Listesi")
+        pencere.geometry("500x400")
+        pencere.transient(self)
+        self._todo_pencere = pencere
+        
+        # Başlık
+        ctk.CTkLabel(pencere, text="📝 Kod İçi Notlar", font=("Segoe UI", 14, "bold"),
+                     text_color=self.colors["text"]).pack(pady=10)
+        
+        # Liste çerçevesi
+        liste_frame = ctk.CTkScrollableFrame(pencere, fg_color="transparent")
+        liste_frame.pack(fill="both", expand=True, padx=10, pady=5)
+        
+        import re
+        kod = self.kod_alani.get("1.0", "end-1c")
+        satirlar = kod.split('\n')
+        
+        todo_bulundu = False
+        for i, satir in enumerate(satirlar, 1):
+            # TODO, FIXME, HACK, XXX, BUG ara
+            match = re.search(r'#.*?(TODO|FIXME|HACK|XXX|BUG)[\s:]*(.*)', satir, re.IGNORECASE)
+            if match:
+                todo_bulundu = True
+                tip = match.group(1).upper()
+                aciklama = match.group(2).strip() or "(açıklama yok)"
+                
+                # Renk
+                renk = {"TODO": "#4caf50", "FIXME": "#ff9800", "HACK": "#f44336", 
+                        "XXX": "#9c27b0", "BUG": "#e91e63"}.get(tip, "#888")
+                
+                frame = ctk.CTkFrame(liste_frame, fg_color=self.colors["sidebar"], corner_radius=6)
+                frame.pack(fill="x", pady=2)
+                
+                ctk.CTkLabel(frame, text=f"{tip}", font=("Segoe UI", 9, "bold"),
+                             text_color=renk, width=60).pack(side="left", padx=8)
+                ctk.CTkLabel(frame, text=f"Satır {i}:", font=("Segoe UI", 9),
+                             text_color="#888", width=50).pack(side="left")
+                ctk.CTkLabel(frame, text=aciklama[:50], font=("Segoe UI", 10),
+                             text_color=self.colors["text"]).pack(side="left", padx=5)
+                
+                # Tıklayınca o satıra git
+                def git(satir_no=i):
+                    self.kod_alani.see(f"{satir_no}.0")
+                    self.kod_alani.mark_set("insert", f"{satir_no}.0")
+                    self.kod_alani.tag_remove("sel", "1.0", "end")
+                    self.kod_alani.tag_add("sel", f"{satir_no}.0", f"{satir_no}.end")
+                
+                ctk.CTkButton(frame, text="Git", width=40, height=20,
+                              fg_color=self.colors["button_bg"], hover_color=self.colors["button_hover"],
+                              font=("Segoe UI", 9), command=git).pack(side="right", padx=5)
+        
+        if not todo_bulundu:
+            ctk.CTkLabel(liste_frame, text="Hiç TODO/FIXME/HACK/XXX/BUG bulunamadı.",
+                         font=("Segoe UI", 11), text_color="#666").pack(pady=20)
+    def _fold_bolgeleri_bul(self):
+        kod = self.kod_alani.get("1.0", "end-1c")
+        satirlar = kod.split("\n")
+
+        bolgeler = []
+        yigin = []
+
+        blok_deseni = re.compile(
+            r"^(fonksiyon|sinif|dongu|eger|degilse_eger|degilse|dene|hata_yakala|yakalama|sonunda)\b"
+        )
+
+        def kapat(bas_satir, bit_satir):
+            if bit_satir <= bas_satir:
+                return
+
+            govde_var = False
+
+            # bas_satir 1 tabanlı; gövde bas_satir+1 satırından başlar
+            for s in satirlar[bas_satir:bit_satir]:
+                if s.strip():
+                    govde_var = True
+                    break
+
+            if govde_var:
+                bolgeler.append((bas_satir, bit_satir))
+
+        for i, satir in enumerate(satirlar, 1):
+            bosluksuz = satir.lstrip()
+
+            # Boş satırlarda fold göstergesi oluşturma
+            if not bosluksuz:
+                continue
+
+            # Yorum satırlarını blok kapatma/açma için kullanma
+            if bosluksuz.startswith("#"):
+                continue
+
+            indent = len(satir) - len(bosluksuz)
+
+            # Mevcut satırın indent'i üstteki bloktan küçük veya eşitse blokları kapat
+            while yigin and indent <= yigin[-1][1]:
+                bas_satir, _ = yigin.pop()
+                kapat(bas_satir, i - 1)
+
+            if blok_deseni.match(bosluksuz):
+                yigin.append((i, indent))
+
+        son_satir = len(satirlar)
+
+        while yigin:
+            bas_satir, _ = yigin.pop()
+            kapat(bas_satir, son_satir)
+
+        return bolgeler
+    def _fold_satir_numaralari_guncelle(self):
+        try:
+            self._satir_numaralarini_ciz()
+        except Exception:
+            pass
+    def _fold_guncelle(self):
+        editor = getattr(self.kod_alani, "_textbox", self.kod_alani)
+        for tag in editor.tag_names():
+            if tag.startswith("fold_"):
+                editor.tag_delete(tag)
+        self.fold_regions = {}
+        self.fold_indicators = {}
+        eski_states = getattr(self, "fold_states", {})
+        self.fold_states = {}
+        if not self.ayarlar.get("satir_numaralari"):
+            self._satir_numaralarini_ciz()
+            return
+        for bas, bit in self._fold_bolgeleri_bul():
+            if bit <= bas:
+                continue
+            tag_adi = f"fold_{bas}"
+            editor.tag_add(tag_adi, f"{bas}.end", f"{bit}.end")
+            folded = eski_states.get(bas, False)
+            self.fold_states[bas] = folded
+            self.fold_regions[bas] = (bas, bit)
+            self.fold_indicators[bas] = "▶" if folded else "▼"
+            editor.tag_config(tag_adi, elide=folded)
+        self._satir_numaralarini_ciz()
+    def _gizli_satirlar(self):
+        """Katlanmış bölgelerde editörde görünmeyen satır numaraları"""
+        gizli = set()
+        for bas, (b0, b1) in getattr(self, "fold_regions", {}).items():
+            if self.fold_states.get(bas):
+                gizli.update(range(b0 + 1, b1 + 1))
+        return gizli
+    def _fold_tikla(self, event=None):
+        try:
+            satir, sutun = self._gutter_rakamini_oku(event)
+            if satir is None:
+                return None
+            if satir not in getattr(self, "fold_indicators", {}):
+                return None
+            if sutun > 1:
+                return None                   # rakama tıklandı → breakpoint'e düşsün
+            editor = getattr(self.kod_alani, "_textbox", self.kod_alani)
+            tag_adi = f"fold_{satir}"
+            if tag_adi not in editor.tag_names():
+                return None
+            if self.fold_indicators[satir] == "▼":
+                self.fold_indicators[satir] = "▶"
+                self.fold_states[satir] = True
+                editor.tag_config(tag_adi, elide=True)
+            else:
+                self.fold_indicators[satir] = "▼"
+                self.fold_states[satir] = False
+                editor.tag_config(tag_adi, elide=False)
+            self._satir_numaralarini_ciz()
+            self._senkronize_scroll()
+            return "break"
+        except Exception:
+            return None
 
     def _sidebar_grip_basla(self, event):
         self._sg_baslangic_x = event.x_root
@@ -1250,7 +1653,7 @@ class TurkceIDE(ctk.CTk):
         self._grip_aktif = False
         
         self.sidebar_grip = ctk.CTkFrame(self, width=4, fg_color="#3c3c3c")
-        self.sidebar_grip.grid(row=0, column=2, rowspan=3, sticky="ns")
+        self.sidebar_grip.grid(row=0, column=2, rowspan=5, sticky="ns")
         self.sidebar_grip.configure(cursor="sb_h_double_arrow")
         
         self.sidebar_grip.bind("<Button-1>", self._sidebar_grip_basla)
@@ -1260,7 +1663,7 @@ class TurkceIDE(ctk.CTk):
         self.sidebar_grip.bind("<Leave>", lambda e: self.sidebar_grip.configure(fg_color="#3c3c3c"))
         
         self.ai_grip = ctk.CTkFrame(self, width=4, fg_color="#3c3c3c")
-        self.ai_grip.grid(row=0, column=4, rowspan=3, sticky="ns")
+        self.ai_grip.grid(row=0, column=4, rowspan=5, sticky="ns")
         self.ai_grip.configure(cursor="sb_h_double_arrow")
         
         self.ai_grip.bind("<Button-1>", self._ai_grip_basla)
@@ -1268,6 +1671,17 @@ class TurkceIDE(ctk.CTk):
         self.ai_grip.bind("<ButtonRelease-1>", self._ai_grip_birak)
         self.ai_grip.bind("<Enter>", lambda e: self.ai_grip.configure(fg_color="#007acc"))
         self.ai_grip.bind("<Leave>", lambda e: self.ai_grip.configure(fg_color="#3c3c3c"))
+
+        self._ghost_line_y = tk.Frame(self, bg="#007acc", height=2)
+        self._ghost_line_y.place_forget()
+
+        self.terminal_grip = ctk.CTkFrame(self, height=5, fg_color="#3c3c3c")
+        self.terminal_grip.configure(cursor="sb_v_double_arrow")
+        self.terminal_grip.bind("<Button-1>", self._terminal_grip_basla)
+        self.terminal_grip.bind("<B1-Motion>", self._terminal_grip_surukle)
+        self.terminal_grip.bind("<ButtonRelease-1>", self._terminal_grip_birak)
+        self.terminal_grip.bind("<Enter>", lambda e: self.terminal_grip.configure(fg_color="#007acc"))
+        self.terminal_grip.bind("<Leave>", lambda e: self.terminal_grip.configure(fg_color="#3c3c3c"))
 
     def _ai_input_focus(self, event=None):
         if self.ai_input.get("1.0", "end-1c").strip() == "Bir şey sor...":
@@ -1280,56 +1694,706 @@ class TurkceIDE(ctk.CTk):
     def renk_ayarlarini_yap(self):
         for tag in ["keyword", "builtin", "string", "comment", "number"]:
             self.kod_alani.tag_config(tag, foreground=self.colors.get(tag, "#d4d4d4"))
+        self.kod_alani.tag_config("fstring", foreground="#ce9178")
 
+        # ODAK KAYBINDA SEÇİMİN SİLİNMEMESİ İÇİN
+        tb = getattr(self.kod_alani, "_textbox", self.kod_alani)
+        tb.configure(
+            exportselection=False,
+            selectbackground=self.colors["selection"],
+            selectforeground=self.colors["text"],
+            inactiveselectbackground=self.colors["selection"],
+        )
+    def _line_numbers_scroll(self, event):
+        kod_tb = getattr(self.kod_alani, "_textbox", self.kod_alani)
+        if getattr(event, "num", 0) == 4 or getattr(event, "delta", 0) > 0:
+            kod_tb.yview_scroll(-3, "units")
+        else:
+            kod_tb.yview_scroll(3, "units")
+        self._senkronize_scroll()
+        return "break"
     def _senkronize_scroll(self, event=None):
-        """Kod alanının scroll pozisyonunu satır numaralarına ve minimapa uygula"""
+        if event and getattr(event, "state", 0) & 0x0004:
+            return None
         try:
-            first, last = self.kod_alani.yview()
+            kod_tb = getattr(self.kod_alani, "_textbox", self.kod_alani)
+            first, last = kod_tb.yview()
             if self.ayarlar.get("satir_numaralari"):
-                self.line_numbers.yview_moveto(first)
-            if hasattr(self, 'minimap') and self.ayarlar.get("minimap"):
-                self.minimap.yview_moveto(first)
+                getattr(self.line_numbers, "_textbox", self.line_numbers).yview_moveto(first)
+            if hasattr(self, "minimap") and self.ayarlar.get("minimap"):
+                getattr(self.minimap, "_textbox", self.minimap).yview_moveto(first)
         except Exception:
             pass
-        
-        if event and event.type == "38":  
-            return None  
 
     def _baglayicilari_ayarla(self):
-        self.kod_alani.bind("<KeyRelease>", self.on_key_release)
-        self.kod_alani.bind("<Tab>", self.on_tab_key)
-        self.kod_alani.bind("<Return>", self.on_return_key)
-        self.kod_alani.bind("<Down>", self.on_arrow_down)
-        self.kod_alani.bind("<Up>", self.on_arrow_up)
-        self.kod_alani.bind("<Escape>", lambda e: self.popup_kapat())
-        self.kod_alani.bind("<FocusOut>", lambda e: self.popup_kapat()) 
-        self.kod_alani.bind("<Button-1>", lambda e: self.popup_kapat(), add="+") 
-        self.kod_alani.bind("<Key>", lambda e: self.after_idle(self.sync_line_numbers))
-        self.kod_alani.bind("<ButtonRelease>", lambda e: self.after_idle(self.sync_line_numbers))
-        self.kod_alani.bind("<Control-s>", lambda e: self.dosya_kaydet())
-        self.kod_alani.bind("<Control-o>", lambda e: self.dosya_ac())
-        self.kod_alani.bind("<Control-r>", lambda e: self.kodu_calistir())
-        self.kod_alani.bind("<F5>", lambda e: self.kodu_calistir())
-        self.kod_alani.bind("<Key>", self._dosya_degisti_kontrol, add="+")
-        self.kod_alani.bind("<MouseWheel>", self._senkronize_scroll)
-        self.kod_alani.bind("<Button-4>", self._senkronize_scroll)
-        self.kod_alani.bind("<Button-5>", self._senkronize_scroll)
-        self.kod_alani._y_scrollbar.bind("<B1-Motion>", lambda e: self._senkronize_scroll())
-        self.kod_alani._y_scrollbar.bind("<ButtonRelease-1>", lambda e: self._senkronize_scroll())
+        txt = getattr(self.kod_alani, "_textbox", self.kod_alani)
+        ctk_sb = getattr(self.kod_alani, "_y_scrollbar", None)
+
+        def _editor_yscroll(*args):
+            if ctk_sb is not None:
+                try:
+                    ctk_sb.set(*args)
+                except Exception:
+                    pass
+            self._senkronize_scroll()
+        
+        txt.configure(yscrollcommand=_editor_yscroll)
+        ln = getattr(self.line_numbers, "_textbox", self.line_numbers)
+        def _guvenli_undo(event=None):
+            try:
+                self.kod_alani.edit_undo()
+            except Exception:
+                pass
+            return "break"
+
+        txt.bind("<Control-Z>", _guvenli_undo)
+        txt.bind("<Control-z>", _guvenli_undo)
+        def _guvenli_redo(event=None):
+            try:
+                self.kod_alani.edit_redo()
+            except Exception:
+                pass
+            return "break"
+
+        txt.bind("<Control-Y>", _guvenli_redo)
+        txt.bind("<Control-y>", _guvenli_redo)
+        txt.bind("<Control-S>", lambda e: self.dosya_kaydet())
+        txt.bind("<Control-t>", lambda e: self._yeni_sekme_olustur())
+        txt.bind("<Control-T>", lambda e: self._yeni_sekme_olustur())
+        txt.bind("<Control-Shift-V>", self._alta_yapistir)
+        txt.bind("<Control-F>", self._bul_penceresi_ac)
+        txt.bind("<Control-O>", lambda e: self.dosya_ac())
+        txt.bind("<Control-R>", lambda e: self.kodu_calistir())
+        txt.bind("<KeyRelease>", self.on_key_release)
+        txt.bind("<Tab>", self._tab_indent)
+        txt.bind("<Shift-ISO_Left_Tab>", self._shift_tab_outdent)
+        txt.bind("<Shift-Tab>", self._shift_tab_outdent)
+        txt.bind("<Return>", self.on_return_key)
+        txt.bind("<Down>", self.on_arrow_down)
+        txt.bind("<Control-j>", self._terminal_toggle)
+        txt.bind("<Up>", self.on_arrow_up)
+        txt.bind("<Escape>", lambda e: self.popup_kapat())
+        txt.bind("<FocusOut>", lambda e: self.popup_kapat())
+        txt.bind("<Button-1>", lambda e: self.popup_kapat(), add="+")
+        txt.bind("<Key>", lambda e: self.after_idle(self.sync_line_numbers), add="+")
+        txt.bind("<ButtonRelease>", lambda e: self.after_idle(self.sync_line_numbers))
+        txt.bind("<Control-s>", lambda e: self.dosya_kaydet())
+        txt.bind("<Control-o>", lambda e: self.dosya_ac())
+        txt.bind("<Control-r>", lambda e: self.kodu_calistir())
+        txt.bind("<F5>", lambda e: self.debugger.devam_et() if getattr(self.debugger, 'calistiriliyor', False) else self.kodu_calistir())
+        txt.bind("<Key>", self._dosya_degisti_kontrol, add="+")
+        txt.bind("<MouseWheel>", self._senkronize_scroll)
+        txt.bind("<Button-4>", self._senkronize_scroll)
+        txt.bind("<Button-5>", self._senkronize_scroll)
+        
+        # Parantez/braket otomatik kapatma
+        txt.bind("<Key>", self._parantez_kapat, add="+")
+        
+        # Seçili metni tırnak içine al
+        txt.bind("<Control-quotedbl>", self._seciliyi_tirnak_icine_al)
+        
+        # Alt satıra yapıştır
+        txt.bind("<Control-v>", None)
+        
+        # Font büyüt/küçült
+        txt.bind("<Control-plus>", self._font_buyut)
+        txt.bind("<Control-minus>", self._font_kucult)
+        txt.bind("<Control-KP_Add>", self._font_buyut)
+        txt.bind("<Control-KP_Subtract>", self._font_kucult)
+        
+        # Yorum satırı
+        txt.bind("<Control-slash>", self._yorum_toggle)
+        
+        # Bul/Değiştir
+        txt.bind("<Control-f>", self._bul_penceresi_ac)
+        txt.bind("<Control-h>", lambda e: self._bul_penceresi_ac(e, degistir=True))
+        
+        # Satır çoğaltma
+        txt.bind("<Control-Shift-D>", self._satir_cogalt)
+        
+        # Boş satır ekleme
+        txt.bind("<Control-Return>", self._bos_satir_ekle_alt)      # ← Düzelt
+        txt.bind("<Control-Shift-Return>", self._bos_satir_ekle_ust) # ← Düzelt
+        
+        # Satır taşıma
+        txt.bind("<Alt-Up>", self._satir_yukari_tasi)
+        txt.bind("<Alt-Down>", self._satir_asagi_tasi)
+        
+        # Komut paleti
+        txt.bind("<Control-Shift-P>", self._komut_paleti_ac)
+        
+        # Debugger
+        ln.bind("<Button-1>", self._line_number_click)
+        txt.bind("<F9>", lambda e: self.debugger.baslat())
+        txt.bind("<F10>", lambda e: self.debugger.adim())
+        
         if self.ayarlar.get("satir_numaralari"):
-            self.line_numbers.bind("<MouseWheel>", lambda e: self._senkronize_scroll())
-            self.line_numbers.bind("<Button-4>", lambda e: self._senkronize_scroll())
-            self.line_numbers.bind("<Button-5>", lambda e: self._senkronize_scroll())
+            ln.bind("<MouseWheel>", self._line_numbers_scroll)
+            ln.bind("<Button-4>", self._line_numbers_scroll)
+            ln.bind("<Button-5>", self._line_numbers_scroll)
         
         if self.ayarlar.get("minimap") and hasattr(self, 'minimap'):
             self.minimap.bind("<MouseWheel>", lambda e: self._senkronize_scroll())
             self.minimap.bind("<Button-4>", lambda e: self._senkronize_scroll())
             self.minimap.bind("<Button-5>", lambda e: self._senkronize_scroll())
+        # Ctrl + " ile seçili metni tırnak içine alma
+        txt.bind("<Key>", self._ctrl_shift_tirnak_kontrol, add="+")
+
+        # Ctrl + tekerlek ile font zoom
+        txt.bind("<Control-MouseWheel>", self._zoom_mousewheel, add="+")
+        txt.bind("<Control-Button-4>", self._zoom_in_event, add="+")
+        txt.bind("<Control-Button-5>", self._zoom_out_event, add="+")
+
+        ln.bind("<Control-MouseWheel>", self._zoom_mousewheel, add="+")
+        ln.bind("<Control-Button-4>", self._zoom_in_event, add="+")
+        ln.bind("<Control-Button-5>", self._zoom_out_event, add="+")
+
+        if hasattr(self, "minimap") and self.minimap is not None:
+            mm = getattr(self.minimap, "_textbox", self.minimap)
+
+            # Minimap tıklama
+            mm.bind("<ButtonRelease-1>", self._minimap_tikla, add="+")
+
+            # Minimap üzerinde Ctrl + tekerlek zoom
+            mm.bind("<Control-MouseWheel>", self._zoom_mousewheel, add="+")
+            mm.bind("<Control-Button-4>", self._zoom_in_event, add="+")
+            mm.bind("<Control-Button-5>", self._zoom_out_event, add="+")
 
         self.popup = None
         self.listbox = None
+    def _line_number_click(self, event=None):
+        try:
+            if self._fold_tikla(event) == "break":
+                return "break"
+        except Exception:
+            pass
 
+        self._breakpoint_toggle(event)
+        return "break"
+
+    def _ctrl_shift_tirnak_kontrol(self, event=None):
+        if not event:
+            return None
+
+        state = getattr(event, "state", 0)
+
+        # Ctrl basılı değilse işlem yapma
+        if not (state & 0x0004):
+            return None
+
+        keysym = str(getattr(event, "keysym", "")).lower()
+        char = getattr(event, "char", "")
+
+        if keysym == "quotedbl" or char == '"':
+            return self._seciliyi_tirnak_icine_al(event)
+
+        return None
+
+    def _zoom_mousewheel(self, event=None):
+        if getattr(event, "delta", 0) > 0:
+            self._font_buyut()
+        else:
+            self._font_kucult()
+        return "break"
+
+    def _zoom_in_event(self, event=None):
+        self._font_buyut()
+        return "break"
+
+    def _zoom_out_event(self, event=None):
+        self._font_kucult()
+        return "break"
+    def _minimap_tikla(self, event=None):
+        try:
+            if not hasattr(self, "minimap") or not self.minimap.winfo_exists():
+                return None
+
+            mm = getattr(self.minimap, "_textbox", self.minimap)
+            hedef = mm.index(f"@{event.x},{event.y}")
+            hedef_satir = int(hedef.split(".")[0])
+
+            self.kod_alani.see(f"{hedef_satir}.0")
+            self.kod_alani.mark_set("insert", f"{hedef_satir}.0")
+            self.kod_alani.focus_set()
+
+            return "break"
+        except Exception:
+            return None
+    def _breakpoint_toggle(self, event=None):
+        try:
+            satir, _ = self._gutter_rakamini_oku(event)
+            if satir is None:
+                return
+            self.debugger.breakpoint_toggle(satir)
+        except Exception:
+            pass
+    def _satir_yukari_tasi(self, event=None):
+        try:
+            imlec = self.kod_alani.index("insert")
+            satir, sutun = imlec.split(".")
+            satir = int(satir)
+            sutun = int(sutun)
+
+            if satir <= 1:
+                return "break"
+
+            mevcut = self.kod_alani.get(f"{satir}.0", f"{satir}.end")
+            ust = self.kod_alani.get(f"{satir - 1}.0", f"{satir - 1}.end")
+
+            self.kod_alani.delete(f"{satir}.0", f"{satir}.end")
+            self.kod_alani.insert(f"{satir}.0", ust)
+
+            self.kod_alani.delete(f"{satir - 1}.0", f"{satir - 1}.end")
+            self.kod_alani.insert(f"{satir - 1}.0", mevcut)
+
+            self.kod_alani.mark_set("insert", f"{satir - 1}.{sutun}")
+
+            self._dosya_degisti_kontrol()
+            self.sync_line_numbers()
+            self.kod_renklendir()
+
+            return "break"
+        except Exception:
+            return None
+    def _komut_paleti_ac(self, event=None):
+        """Ctrl+Shift+P ile komut paleti aç"""
+        if hasattr(self, '_palet_pencere') and self._palet_pencere.winfo_exists():
+            self._palet_pencere.lift()
+            self._palet_entry.focus()
+            return "break"
+        
+        pencere = ctk.CTkToplevel(self)
+        pencere.title("Komut Paleti")
+        pencere.geometry("500x400")
+        pencere.transient(self)
+        pencere.resizable(False, False)
+        self._palet_pencere = pencere
+        
+        # Komut listesi
+        self.komutlar = [
+            ("Dosya: Yeni Sekme", self._yeni_sekme_olustur, "Ctrl+T"),
+            ("Dosya: Aç", self.dosya_ac, "Ctrl+O"),
+            ("Dosya: Kaydet", self.dosya_kaydet, "Ctrl+S"),
+            ("Kod: Çalıştır", self.kodu_calistir, "Ctrl+R / F5"),
+            ("Kod: Yorum Satırı Aç/Kapat", self._yorum_toggle, "Ctrl+/"),
+            ("Kod: Satırı Yukarı Taşı", self._satir_yukari_tasi, "Alt+↑"),
+            ("Kod: Satırı Aşağı Taşı", self._satir_asagi_tasi, "Alt+↓"),
+            ("Kod: Satırı Çoğalt", self._satir_cogalt, "Ctrl+Shift+D"),
+            ("Editör: Bul", lambda: self._bul_penceresi_ac(degistir=False), "Ctrl+F"),
+            ("Editör: Değiştir", lambda: self._bul_penceresi_ac(degistir=True), "Ctrl+H"),
+            ("Editör: Font Büyüt", self._font_buyut, "Ctrl++"),
+            ("Editör: Font Küçült", self._font_kucult, "Ctrl+-"),
+            ("AI: Kodu Düzelt", self._ai_kodu_duzelt, ""),
+            ("AI: Kodu Açıkla", self._ai_kodu_acikla, ""),
+            ("AI: Kodu Optimize Et", self._ai_kodu_optimize, ""),
+            ("Görünüm: Gezgin Aç/Kapat", self._gezgin_ac, ""),
+            ("Görünüm: AI Panel Aç/Kapat", self._ai_panel_toggle, ""),
+            ("Ayarlar: Pencere Aç", self._ayarlar_penceresi_ac, ""),
+            ("Görünüm: Terminal Aç/Kapat", self._terminal_toggle, "Ctrl+J"),
+            ("Kod: TürKod ⇄ Python Çevir", self._kodu_cevir, ""),
+        ]
+        
+        # Arama kutusu
+        self._palet_entry = ctk.CTkEntry(pencere, font=("Segoe UI", 12), height=35)
+        self._palet_entry.pack(fill="x", padx=10, pady=10)
+        self._palet_entry.focus()
+        
+        # Sonuç listesi
+        self._palet_liste = tk.Listbox(
+            pencere, 
+            bg=self.colors["sidebar"],
+            fg=self.colors["text"],
+            selectbackground=self.colors.get("selection", "#264f78"),
+            font=("Segoe UI", 11),
+            bd=0, highlightthickness=0
+        )
+        self._palet_liste.pack(fill="both", expand=True, padx=10, pady=(0, 10))
+        
+        def _palet_filtrele(*args):
+            arama = self._palet_entry.get().lower()
+            self._palet_liste.delete(0, tk.END)
+            for isim, cmd, kisa in self.komutlar:
+                if arama in isim.lower():
+                    self._palet_liste.insert(tk.END, f"{isim}  ({kisa})" if kisa else isim)
+        
+        def _palet_calistir(event=None):
+            secili = self._palet_liste.curselection()
+            if not secili:
+                return
+            metin = self._palet_liste.get(secili[0]).split("  (")[0]
+            for isim, cmd, kisa in self.komutlar:
+                if isim == metin:
+                    pencere.destroy()
+                    cmd()
+                    break
+        
+        self._palet_entry.bind("<KeyRelease>", _palet_filtrele)
+        self._palet_liste.bind("<Double-Button-1>", _palet_calistir)
+        self._palet_liste.bind("<Return>", _palet_calistir)
+        self._palet_entry.bind("<Return>", _palet_calistir)
+        self._palet_entry.bind("<Down>", lambda e: self._palet_liste.focus() or self._palet_liste.select_set(0))
+        
+        # İlk listeyi doldur
+        _palet_filtrele()
+        
+        return "break"
+    def _satir_asagi_tasi(self, event=None):
+        try:
+            imlec = self.kod_alani.index("insert")
+            satir, sutun = imlec.split(".")
+            satir = int(satir)
+            sutun = int(sutun)
+
+            son_satir = int(self.kod_alani.index("end-1c").split(".")[0])
+
+            if satir >= son_satir:
+                return "break"
+
+            mevcut = self.kod_alani.get(f"{satir}.0", f"{satir}.end")
+            alt = self.kod_alani.get(f"{satir + 1}.0", f"{satir + 1}.end")
+
+            self.kod_alani.delete(f"{satir}.0", f"{satir}.end")
+            self.kod_alani.insert(f"{satir}.0", alt)
+
+            self.kod_alani.delete(f"{satir + 1}.0", f"{satir + 1}.end")
+            self.kod_alani.insert(f"{satir + 1}.0", mevcut)
+
+            self.kod_alani.mark_set("insert", f"{satir + 1}.{sutun}")
+
+            self._dosya_degisti_kontrol()
+            self.sync_line_numbers()
+            self.kod_renklendir()
+
+            return "break"
+        except Exception:
+            return None
+    def _bos_satir_ekle_alt(self, event=None):
+        """Ctrl+Enter → İmleç hareket etmeden alt satıra boş satır ekle"""
+        try:
+            satir = self.kod_alani.index("insert").split(".")[0]
+            self.kod_alani.insert(f"{satir}.end", "\n")
+            self.sync_line_numbers()
+            return "break"
+        except Exception:
+            pass
+        return None
+
+    def _bos_satir_ekle_ust(self, event=None):
+        """Ctrl+Shift+Enter → İmleç hareket etmeden üst satıra boş satır ekle"""
+        try:
+            satir = self.kod_alani.index("insert").split(".")[0]
+            self.kod_alani.insert(f"{satir}.0", "\n")
+            self.sync_line_numbers()
+            return "break"
+        except Exception:
+            pass
+        return None
+    def _satir_cogalt(self, event=None):
+        """Ctrl+Shift+D ile mevcut satırı altına kopyala"""
+        try:
+            satir = self.kod_alani.index("insert").split(".")[0]
+            satir_metni = self.kod_alani.get(f"{satir}.0", f"{satir}.end")
+            self.kod_alani.insert(f"{satir}.end", f"\n{satir_metni}")
+            self.sync_line_numbers()
+            self.kod_renklendir()
+            return "break"
+        except Exception:
+            pass
+        return None
+    def _bul_penceresi_ac(self, event=None, degistir=False):
+        # Panel açıksa: aynı modsa öne getir, farklı modsa yeniden kur
+        if hasattr(self, '_bul_pencere') and self._bul_pencere.winfo_exists():
+            if getattr(self, '_bul_modu', None) == degistir:
+                self._bul_pencere.lift()
+                return "break"
+            self._bul_pencere.destroy()
+
+        pencere = ctk.CTkToplevel(self)
+        pencere.title("Değiştir" if degistir else "Bul")
+        pencere.geometry("400x160" if degistir else "400x100")
+        pencere.transient(self)
+        pencere.resizable(False, False)
+        self._bul_pencere = pencere
+        self._bul_modu = degistir
+
+        def _kapat():
+            self.kod_alani.tag_remove("sel", "1.0", "end")
+            pencere.destroy()
+
+        pencere.protocol("WM_DELETE_WINDOW", _kapat)
+        pencere.bind("<Escape>", lambda e: _kapat())
+
+        # Bul satırı
+        ctk.CTkLabel(pencere, text="Bul:", font=("Segoe UI", 11)).grid(row=0, column=0, padx=10, pady=8, sticky="e")
+        bul_var = ctk.StringVar()
+        bul_entry = ctk.CTkEntry(pencere, textvariable=bul_var, width=280)
+        bul_entry.grid(row=0, column=1, padx=5, pady=8, sticky="w")
+        bul_entry.focus()
+
+        # Değiştir satırı (SADECE Ctrl+H)
+        degis_var = ctk.StringVar()
+        degis_entry = None
+        if degistir:
+            ctk.CTkLabel(pencere, text="Değiştir:", font=("Segoe UI", 11)).grid(row=1, column=0, padx=10, pady=5, sticky="e")
+            degis_entry = ctk.CTkEntry(pencere, textvariable=degis_var, width=280)
+            degis_entry.grid(row=1, column=1, padx=5, pady=5, sticky="w")
+
+        def bul_sonraki():
+            aranan = bul_var.get()
+            if not aranan:
+                return
+            bas = self.kod_alani.index("insert")
+            pos = self.kod_alani.search(aranan, bas, stopindex="end")
+            if not pos:
+                pos = self.kod_alani.search(aranan, "1.0", stopindex=bas)
+            if pos:
+                bit = f"{pos}+{len(aranan)}c"
+                self.kod_alani.tag_remove("sel", "1.0", "end")
+                self.kod_alani.tag_add("sel", pos, bit)
+                self.kod_alani.mark_set("insert", bit)
+                self.kod_alani.see(pos)
+
+        def secili_degistir():
+            aranan = bul_var.get()
+            degisen = degis_var.get()
+            if not aranan:
+                return
+            if self.kod_alani.tag_ranges("sel"):
+                secili = self.kod_alani.get("sel.first", "sel.last")
+                if secili == aranan:
+                    self.kod_alani.delete("sel.first", "sel.last")
+                    self.kod_alani.insert("insert", degisen)
+            bul_sonraki()
+
+        def tumunu_degistir():
+            aranan = bul_var.get()
+            degisen = degis_var.get()
+            if not aranan:
+                return
+            icerik = self.kod_alani.get("1.0", "end-1c")
+            self.kod_alani.delete("1.0", "end")
+            self.kod_alani.insert("1.0", icerik.replace(aranan, degisen))
+            self.sync_line_numbers()
+            self.kod_renklendir()
+
+        btn_frame = ctk.CTkFrame(pencere, fg_color="transparent")
+        btn_frame.grid(row=2 if degistir else 1, column=0, columnspan=2, pady=10)
+
+        ctk.CTkButton(btn_frame, text="Sonraki", width=80, command=bul_sonraki,
+            fg_color=self.colors["button_bg"], hover_color=self.colors["button_hover"]).pack(side="left", padx=3)
+
+        # Değiştir butonları SADECE degistir=True ise (Ctrl+H)
+        if degistir:
+            ctk.CTkButton(btn_frame, text="Değiştir", width=80, command=secili_degistir,
+                fg_color=self.colors["button_bg"], hover_color=self.colors["button_hover"]).pack(side="left", padx=3)
+            ctk.CTkButton(btn_frame, text="Tümünü Değiştir", width=110, command=tumunu_degistir,
+                fg_color="#c75450", hover_color="#a03030").pack(side="left", padx=3)
+
+        ctk.CTkButton(btn_frame, text="Kapat", width=60, command=_kapat,
+            fg_color="transparent", hover_color="#c75450").pack(side="left", padx=3)
+
+        bul_entry.bind("<Return>", lambda e: bul_sonraki())
+        if degistir and degis_entry is not None:
+            degis_entry.bind("<Return>", lambda e: secili_degistir())
+
+        return "break"
+    def _yorum_toggle(self, event=None):
+        """Ctrl+/ ile seçili satırları yorumla veya yorumdan çıkar"""
+        try:
+            if self.kod_alani.tag_ranges("sel"):
+                bas = self.kod_alani.index("sel.first")
+                bit = self.kod_alani.index("sel.last")
+            else:
+                satir = self.kod_alani.index("insert").split(".")[0]
+                bas = f"{satir}.0"
+                bit = f"{satir}.end"
+            
+            bas_satir = int(bas.split(".")[0])
+            bit_satir = int(bit.split(".")[0])
+            
+            # Tüm satırlar yorumlu mu kontrol et
+            hepsi_yorumlu = True
+            for satir_no in range(bas_satir, bit_satir + 1):
+                satir_metni = self.kod_alani.get(f"{satir_no}.0", f"{satir_no}.end")
+                if satir_metni.strip() and not satir_metni.strip().startswith("#"):
+                    hepsi_yorumlu = False
+                    break
+            
+            for satir_no in range(bas_satir, bit_satir + 1):
+                satir_metni = self.kod_alani.get(f"{satir_no}.0", f"{satir_no}.end")
+                if hepsi_yorumlu:
+                    # Yorumdan çıkar
+                    if satir_metni.strip().startswith("# "):
+                        yeni = satir_metni.replace("# ", "", 1)
+                    elif satir_metni.strip().startswith("#"):
+                        yeni = satir_metni.replace("#", "", 1)
+                    else:
+                        continue
+                    self.kod_alani.delete(f"{satir_no}.0", f"{satir_no}.end")
+                    self.kod_alani.insert(f"{satir_no}.0", yeni)
+                else:
+                    # Yorum yap
+                    if satir_metni.strip():
+                        self.kod_alani.insert(f"{satir_no}.0", "# ")
+            
+            self.sync_line_numbers()
+            self.kod_renklendir()
+            return "break"
+        except Exception:
+            pass
+        return None
+    def _parantez_kapat(self, event=None):
+        if not event or len(getattr(event, "char", "")) != 1:
+            return None
+
+        # Ctrl basılıysa özel kısayolları bozma
+        if getattr(event, "state", 0) & 0x0004:
+            return None
+        
+        acilis = {'(': ')', '[': ']', '{': '}', '"': '"', "'": "'"}
+        kapanis = {')', ']', '}', '"', "'"}
+        
+        # Kapanış karakteri yazıldıysa ve sağda aynısı varsa sadece sağa geç
+        if event.char in kapanis:
+            try:
+                sag = self.kod_alani.get("insert", "insert+1c")
+                if sag == event.char:
+                    self.kod_alani.mark_set("insert", "insert+1c")
+                    return "break"  # ← Ekle
+            except:
+                pass
+            return None  # Normal karakter, default handler çalışsın
+        
+        if event.char not in acilis:
+            return None
+        
+        kapat = acilis[event.char]
+        
+        try:
+            if self.kod_alani.tag_ranges("sel"):
+                secili = self.kod_alani.get("sel.first", "sel.last")
+                self.kod_alani.delete("sel.first", "sel.last")
+                self.kod_alani.insert("insert", f"{event.char}{secili}{kapat}")
+                # Seçili metni tekrar seç (açılış ve kapanış hariç)
+                self.kod_alani.tag_remove("sel", "1.0", "end")
+                self.kod_alani.tag_add("sel", "insert-1c", f"insert-{len(kapat)}c")
+                self.kod_alani.mark_set("insert", f"insert-{len(kapat)}c")
+                return "break"  # ← Ekle
+            else:
+                self.kod_alani.insert("insert", f"{event.char}{kapat}")
+                self.kod_alani.mark_set("insert", "insert-1c")
+                return "break"  # ← Ekle
+        except:
+            return None
+    def _alta_yapistir(self, event=None):
+        """Ctrl+V ile panodaki metni yeni satıra yapıştırır"""
+        try:
+            icerik = self.clipboard_get()
+            # İmleci satır sonuna götür, yeni satır aç, yapıştır
+            satir = self.kod_alani.index("insert").split(".")[0]
+            satir_sonu = f"{satir}.end"
+            self.kod_alani.mark_set("insert", satir_sonu)
+            self.kod_alani.insert("insert", "\n" + icerik)
+            self.sync_line_numbers()
+            self.kod_renklendir()
+            return "break"
+        except Exception:
+            # Normal yapıştırma davranışı (panoda metin yoksa vs.)
+            return None
+    def _font_buyut(self, event=None):
+        """Ctrl++ → Font boyutunu 1 artır"""
+        mevcut = self.ayarlar.get("yazi_boyutu")
+        if mevcut < 32:
+            yeni = mevcut + 1
+            self.ayarlar.set("yazi_boyutu", yeni)
+            self.kod_alani.configure(font=(self.ayarlar.get("yazi_tipi"), yeni))
+            self.line_numbers.configure(font=(self.ayarlar.get("yazi_tipi"), yeni))
+            self.status_left.configure(text=f"  Font boyutu: {yeni}px")
+        return "break"
+
+    def _font_kucult(self, event=None):
+        """Ctrl+- → Font boyutunu 1 azalt"""
+        mevcut = self.ayarlar.get("yazi_boyutu")
+        if mevcut > 8:
+            yeni = mevcut - 1
+            self.ayarlar.set("yazi_boyutu", yeni)
+            self.kod_alani.configure(font=(self.ayarlar.get("yazi_tipi"), yeni))
+            self.line_numbers.configure(font=(self.ayarlar.get("yazi_tipi"), yeni))
+            self.status_left.configure(text=f"  Font boyutu: {yeni}px")
+        return "break"
+    def _shift_tab_outdent(self, event=None):
+        """Shift+Tab: Seçili satırları sola kaydır"""
+        try:
+            if self.kod_alani.tag_ranges("sel"):
+                bas = self.kod_alani.index("sel.first")
+                bit = self.kod_alani.index("sel.last")
+                bas_satir = int(bas.split(".")[0])
+                bit_satir = int(bit.split(".")[0])
+                
+                for satir_no in range(bas_satir, bit_satir + 1):
+                    satir_metni = self.kod_alani.get(f"{satir_no}.0", f"{satir_no}.4")
+                    if satir_metni.startswith("    "):
+                        self.kod_alani.delete(f"{satir_no}.0", f"{satir_no}.4")
+                    elif satir_metni.startswith("  "):
+                        self.kod_alani.delete(f"{satir_no}.0", f"{satir_no}.2")
+                    elif satir_metni.startswith(" "):
+                        self.kod_alani.delete(f"{satir_no}.0", f"{satir_no}.1")
+                    elif satir_metni.startswith("\t"):
+                        self.kod_alani.delete(f"{satir_no}.0", f"{satir_no}.1")
+                
+                yeni_bas = f"{bas_satir}.0"
+                yeni_bit = f"{bit_satir}.end"
+                self.kod_alani.tag_remove("sel", "1.0", "end")
+                self.kod_alani.tag_add("sel", yeni_bas, yeni_bit)
+                
+                self.sync_line_numbers()
+                return "break"
+        except Exception:
+            pass
+        return None
+    def _seciliyi_tirnak_icine_al(self, event=None):
+        try:
+            if self.kod_alani.tag_ranges("sel"):
+                bas = self.kod_alani.index("sel.first")
+                bit = self.kod_alani.index("sel.last")
+                secili = self.kod_alani.get(bas, bit)
+
+                self.kod_alani.delete(bas, bit)
+                self.kod_alani.insert(bas, f'"{secili}"')
+
+                self.kod_alani.tag_remove("sel", "1.0", "end")
+                self.kod_alani.tag_add(
+                    "sel",
+                    f"{bas}+1c",
+                    f"{bas}+{len(secili) + 1}c"
+                )
+                self.kod_alani.mark_set("insert", f"{bas}+{len(secili) + 1}c")
+
+                self._dosya_degisti_kontrol()
+                self.sync_line_numbers()
+                self.kod_renklendir()
+                return "break"
+
+            kelime, bas, bit = self.mevcut_kelimeyi_al()
+            if kelime:
+                self.kod_alani.delete(bas, bit)
+                self.kod_alani.insert(bas, f'"{kelime}"')
+                self.kod_alani.mark_set("insert", f"{bas}+{len(kelime) + 1}c")
+
+                self._dosya_degisti_kontrol()
+                self.sync_line_numbers()
+                self.kod_renklendir()
+                return "break"
+
+        except Exception:
+            pass
+
+        return None
     def _dosya_degisti_kontrol(self, event=None):
+        if event is not None:
+            # Sadece metni gerçekten değiştiren tuşlar
+            if not event.char and event.keysym not in ("Return", "BackSpace", "Delete", "Tab"):
+                return
         sekme = self._aktif_sekme()
         if sekme and not sekme["degisti"]:
             sekme["degisti"] = True
@@ -1459,100 +2523,35 @@ class TurkceIDE(ctk.CTk):
             if not item:
                 return
             item = item[0]
-        
+
         values = self.dosya_tree.item(item, "values")
         if not values or len(values) < 2:
             return
-        
+
         tam_yol, tip = values[0], values[1]
-        
+
         if tip == "file":
             if os.path.exists(tam_yol):
                 self._dosya_ac_yol(tam_yol)
             return
-        
+
         if tip != "directory":
             return
-        
+
         durum = values[2] if len(values) > 2 else "collapsed"
-        
+
         if durum == "collapsed":
             for child in self.dosya_tree.get_children(item):
                 self.dosya_tree.delete(child)
-            
-            def _yukle():
-                try:
-                    with os.scandir(tam_yol) as entries:
-                        tum_girdiler = list(entries)
-                        MAX_OGE = 300
-                        fazla_mesaj = None
-                        
-                        if len(tum_girdiler) > MAX_OGE:
-                            tum_girdiler = tum_girdiler[:MAX_OGE]
-                            fazla_mesaj = f"... ({len(tum_girdiler) - MAX_OGE} öğe daha var)"
-                        
-                        klasorler = []
-                        dosyalar = []
-                        
-                        for entry in tum_girdiler:
-                            if entry.name.startswith('.'):
-                                continue
-                            if entry.is_dir(follow_symlinks=False):
-                                klasorler.append(entry)
-                            elif entry.is_file(follow_symlinks=False):
-                                dosyalar.append(entry)
-                        
-                        klasorler.sort(key=lambda e: e.name.lower())
-                        dosyalar.sort(key=lambda e: e.name.lower())
-                        
-                        def _ekle():
-                            for entry in klasorler:
-                                yol = entry.path
-                                node = self.dosya_tree.insert(
-                                    item, "end",
-                                    text=f"📁 {entry.name}",
-                                    values=(yol, "directory", "collapsed"),
-                                    tags=("directory",)
-                                )
-                                self.dosya_tree.insert(node, "end", text="⏳ Yükleniyor...", 
-                                                       values=("", "dummy"), tags=("dummy",))
-                            
-                            for entry in dosyalar:
-                                yol = entry.path
-                                uzanti = os.path.splitext(entry.name)[1].lower()
-                                if uzanti == ".trpy":
-                                    icon, tag = "📄", "trpy"
-                                elif uzanti == ".py":
-                                    icon, tag = "🐍", "python"
-                                else:
-                                    icon, tag = "📄", "other"
-                                
-                                self.dosya_tree.insert(
-                                    item, "end",
-                                    text=f"{icon} {entry.name}",
-                                    values=(yol, "file"),
-                                    tags=(tag,)
-                                )
-                            
-                            if fazla_mesaj:
-                                self.dosya_tree.insert(item, "end", text=fazla_mesaj,
-                                                       values=("", "dummy"), tags=("dummy",))
-                            
-                            self.dosya_tree.item(item, values=(tam_yol, "directory", "expanded"))
-                            self.dosya_tree.item(item, open=True)
-                        
-                        self.after(0, _ekle)
-                        
-                except Exception as e:
-                    print(f"[TurKod] Ağaç açma hatası: {e}")
-            
-            threading.Thread(target=_yukle, daemon=True).start()
-            
+
+            # Thread/after YOK: ana thread'de doğrudan doldur
+            self._tree_doldur(tam_yol, item)
+            self.dosya_tree.item(item, values=(tam_yol, "directory", "expanded"))
+            self.dosya_tree.item(item, open=True)
         else:
             for child in self.dosya_tree.get_children(item):
                 self.dosya_tree.delete(child)
-            
-            self.dosya_tree.insert(item, "end", text="⏳ Yükleniyor...", 
+            self.dosya_tree.insert(item, "end", text="⏳ Yükleniyor...",
                                    values=("", "dummy"), tags=("dummy",))
             self.dosya_tree.item(item, values=(tam_yol, "directory", "collapsed"))
             self.dosya_tree.item(item, open=False)
@@ -1597,12 +2596,26 @@ class TurkceIDE(ctk.CTk):
             self.grid_columnconfigure(1, minsize=0)   
             self.explorer_btn.configure(text="▶")
         else:
-            self.sidebar.grid(row=0, column=1, rowspan=3, sticky="nsew", padx=(0, 0))
-            self.sidebar_grip.grid(row=0, column=2, rowspan=3, sticky="ns")
+            self.sidebar.grid(row=0, column=1, rowspan=5, sticky="nsew", padx=(0, 0))
+            self.sidebar_grip.grid(row=0, column=2, rowspan=5, sticky="ns")
             self.grid_columnconfigure(1, minsize=220)  
             self.explorer_btn.configure(text="◀")
 
     # ============ AI PANEL ============
+    def _ai_kodu_acikla(self):
+        kod = self.kod_alani.get("1.0", "end-1c").strip()
+
+        if not kod:
+            self._ai_mesaj_ekle("assistant", "⚠️ Açıklanacak kod bulunamadı.")
+            return
+
+        prompt = f"""Aşağıdaki TürKod kodunu satır satır açıkla ve ne yaptığını özetle:
+
+    ```TürKod
+    {kod}
+    ```"""
+
+        self._ai_gonder_prompt(prompt)
     def _ai_kodu_uygula(self, kod):
         # Kod zaten TürKod (program çevirdi), direkt uygula
         mevcut_kod = self.kod_alani.get("1.0", "end-1c").strip()
@@ -1672,6 +2685,10 @@ class TurkceIDE(ctk.CTk):
 
         for widget in [frame, lbl]:
             widget.bind("<Button-1>", lambda e, id=sid: self._sekme_aktif_yap(id))
+        for widget in (frame, lbl, kapat_btn):
+            widget.bind("<MouseWheel>", self._sekme_wheel)
+            widget.bind("<Button-4>", lambda e: self._sekme_kaydir(120))
+            widget.bind("<Button-5>", lambda e: self._sekme_kaydir(-120))
 
         sekme = {
             "id": sid,
@@ -1685,6 +2702,7 @@ class TurkceIDE(ctk.CTk):
         }
         self.sekmeler.append(sekme)
         self._sekme_aktif_yap(sid)
+        self._sekme_layout_guncelle()
         return sid
 
     def _sekme_bul(self, sid):
@@ -1729,16 +2747,16 @@ class TurkceIDE(ctk.CTk):
             sekme["icerik"] = self.kod_alani.get("1.0", "end-1c")
 
         if sekme["degisti"]:
-            self._sekme_aktif_yap(sid)  
-            cevap = messagebox.askyesnocancel("Kaydet?",
-                f"'{sekme['isim']}' için değişiklikler kaydedilsin mi?")
+            cevap = messagebox.askyesnocancel("Kaydet?", f"'{sekme['isim']}' kaydedilsin mi?")
             if cevap is None:
                 return
             if cevap:
+                self._sekme_aktif_yap(sid)
                 self.dosya_kaydet()
 
         sekme["frame"].destroy()
         self.sekmeler.remove(sekme)
+        self._sekme_layout_guncelle()
 
         if self.sekmeler:
             self._sekme_aktif_yap(self.sekmeler[-1]["id"])
@@ -1751,10 +2769,7 @@ class TurkceIDE(ctk.CTk):
         sekme = self._aktif_sekme() if sid is None else self._sekme_bul(sid)
         if not sekme:
             return
-        isim = sekme["isim"]
-        if sekme["degisti"]:
-            isim += " ●"
-        sekme["label"].configure(text=isim)
+        self._sekme_etiket_kirp(sekme, getattr(self, "_sekme_genisligi", 170))
 
     def _status_guncelle(self):
         sekme = self._aktif_sekme()
@@ -1769,10 +2784,10 @@ class TurkceIDE(ctk.CTk):
         self.status_left.configure(text="  Kod panoya kopyalandi ✓")
 
     def _ai_kod_bloju_olustur(self, parent, kod, dil=""):
-        frame = ctk.CTkFrame(parent, fg_color="#1e1e1e", corner_radius=6, 
-                            border_width=1, border_color="#3c3c3c")
+        frame = ctk.CTkFrame(parent, fg_color=self.colors.get("bg", "#1e1e1e"), corner_radius=6,
+                     border_width=1, border_color=self.colors["border"])
         
-        bar = ctk.CTkFrame(frame, fg_color="#252526", height=32, corner_radius=0)
+        bar = ctk.CTkFrame(frame, fg_color=self.colors.get("sidebar", "#252526"), height=32, corner_radius=0)
         bar.pack(fill="x", padx=0, pady=0)
         bar.pack_propagate(False)
             
@@ -1801,9 +2816,10 @@ class TurkceIDE(ctk.CTk):
         satir_sayisi = kod.count('\n') + 1
         yukseklik = min(250, satir_sayisi * 18 + 20)  
             
-        kod_text = ctk.CTkTextbox(frame, font=("Consolas", 11), 
-                                    fg_color="#1e1e1e", text_color="#d4d4d4",
-                                    wrap="none", height=yukseklik)
+        kod_text = ctk.CTkTextbox(frame, font=("Consolas", 11),
+                          fg_color=self.colors.get("bg", "#1e1e1e"),
+                          text_color=self.colors.get("text", "#d4d4d4"),
+                          wrap="none", height=yukseklik)
         kod_text.pack(fill="x", padx=5, pady=5)
         kod_text.insert("1.0", kod)
         kod_text.configure(state="disabled") 
@@ -1852,8 +2868,8 @@ class TurkceIDE(ctk.CTk):
             self.ai_panel_visible = False
             self.ai_toggle_btn.configure(text="◀")
         else:
-            self.ai_panel.grid(row=0, column=5, rowspan=3, sticky="nsew")
-            self.ai_grip.grid(row=0, column=4, rowspan=3, sticky="ns")
+            self.ai_panel.grid(row=0, column=5, rowspan=5, sticky="nsew")
+            self.ai_grip.grid(row=0, column=4, rowspan=5, sticky="ns")
             self.grid_columnconfigure(5, minsize=480)  
             self.ai_panel_visible = True
             self.ai_toggle_btn.configure(text="▶")
@@ -1892,7 +2908,9 @@ class TurkceIDE(ctk.CTk):
 
         parcalar = self._ai_mesaj_parse_et(mesaj)
         panel_genislik = self.ai_panel.winfo_width()
-        wrap_length = max(200, panel_genislik - 80)  # Kenar boşlukları çıkar
+        if panel_genislik < 100:
+            panel_genislik = 400  # Varsayılan değer
+        wrap_length = max(200, panel_genislik - 80)
         for parca in parcalar:
             if parca[0] == "metin":
                 text = parca[1]
@@ -2017,31 +3035,193 @@ Yapacakların:
 - Yapılan iyileştirmeleri kısaca açıkla
 - Optimize edilmiş kodu Türkod bloğunda ver"""
         self._ai_gonder_prompt(prompt)
+    def _yerel_duzelt_sozluk(self):
+        """Yerel düzeltme için sözlük kelime listesini üret"""
+        if hasattr(self, "_yerel_duzelt_sozluk_cache"):
+            return self._yerel_duzelt_sozluk_cache
 
+        kelimeler = set()
+
+        try:
+            for kelime in TURKCE_KELIMELER:
+                kelime = str(kelime).strip()
+                if kelime and " " not in kelime:
+                    kelimeler.add(kelime)
+        except Exception:
+            pass
+
+        try:
+            for desen in SOZLUK.keys():
+                temiz = str(desen).replace(r"\b", "").strip()
+                temiz = temiz.strip('"').strip("'")
+
+                if temiz and " " not in temiz and "." not in temiz:
+                    kelimeler.add(temiz)
+        except Exception:
+            pass
+
+        # Sözlük yüklenmezse temel kelimeler yine çalışsın
+        kelimeler.update([
+            "yazdir", "girdi_al", "fonksiyon", "sinif", "eger", "degilse",
+            "degilse_eger", "dongu", "kir", "devam_et", "gec", "dene",
+            "hata_yakala", "sonunda", "ice_aktar", "dondur", "ve", "veya", "degil"
+        ])
+
+        self._yerel_duzelt_sozluk_cache = sorted(kelimeler)
+        return self._yerel_duzelt_sozluk_cache
+
+    def _yerel_duzelt_sozluk_haritasi(self):
+        """Küçük harf tabanlı sözlük haritasını üret"""
+        if hasattr(self, "_yerel_duzelt_sozluk_map") and hasattr(self, "_yerel_duzelt_sozluk_kucuk_listesi"):
+            return self._yerel_duzelt_sozluk_map, self._yerel_duzelt_sozluk_kucuk_listesi
+
+        sozluk = self._yerel_duzelt_sozluk()
+        sozluk_map = {}
+
+        for kelime in sozluk:
+            kucuk = kelime.lower()
+            if kucuk not in sozluk_map:
+                sozluk_map[kucuk] = kelime
+
+        self._yerel_duzelt_sozluk_map = sozluk_map
+        self._yerel_duzelt_sozluk_kucuk_listesi = sorted(sozluk_map.keys())
+
+        return self._yerel_duzelt_sozluk_map, self._yerel_duzelt_sozluk_kucuk_listesi
+
+    def _kodu_yerel_duzelt(self, kod):
+        """Koddaki bilinmeyen kelimeleri sözlükteki en yakın kelimeyle düzeltir"""
+        import difflib
+
+        sozluk_map, sozluk_kucuk_listesi = self._yerel_duzelt_sozluk_haritasi()
+
+        if not sozluk_kucuk_listesi:
+            return kod, set()
+
+        try:
+            tanimli_kelimeler = set(self._koddan_tanimlari_cikar(kod))
+        except Exception:
+            tanimli_kelimeler = set()
+
+        tanimli_kucuk = {str(k).lower() for k in tanimli_kelimeler}
+        # Nokta sonrası kullanılan isimler (öznitelik/metot) kullanıcıya aittir, düzeltme
+        attr_adlari = re.findall(r'\.\s*([a-zA-Z_][a-zA-Z0-9_ÇŞĞÜÖİçşğüöı]*)', kod)
+        tanimli_kucuk |= {a.lower() for a in attr_adlari}
+
+        degisiklikler = set()
+        cache = {}
+
+        string_ve_yorum = r'("(?:[^"\\]|\\.)*"|\'(?:[^\'\\]|\\.)*\'|#.*)'
+        parcalar = re.split(string_ve_yorum, kod)
+        kelime_deseni = r"[A-Za-z_ÇŞĞÜÖİçşğüöı][A-Za-z0-9_ÇŞĞÜÖİçşğüöı]*"
+
+        def bitisik_takasla_duzelt(kelime):
+            """
+            Bitişik iki harfin yer değiştirdiği yazım hatalarını yakalar.
+            Örnek:
+            egre -> eger
+            yazidr -> yazdir
+            """
+            for i in range(len(kelime) - 1):
+                takas = kelime[:i] + kelime[i + 1] + kelime[i] + kelime[i + 2:]
+                if takas in sozluk_map:
+                    return sozluk_map[takas]
+            return None
+
+        def duzelt(match):
+            token = match.group(0)
+
+            # Çok kısa kelimeleri düzeltme
+            if len(token) < 4:
+                return token
+
+            kucuk = token.lower()
+
+            # Zaten sözlükte varsa veya kod içinde tanımlıysa dokunma
+            if kucuk in sozluk_map or kucuk in tanimli_kucuk:
+                return token
+
+            if kucuk in cache:
+                return cache[kucuk]
+
+            # 1) Bitişik harf takası: egre -> eger
+            takas = bitisik_takasla_duzelt(kucuk)
+            if takas and takas != token:
+                degisiklikler.add((token, takas))
+                cache[kucuk] = takas
+                return takas
+
+            # 2) Kısa kelimelerde daha esnek, uzun kelimelerde daha güvenli
+            if len(kucuk) <= 5:
+                cutoff = 0.60
+            elif len(kucuk) <= 8:
+                cutoff = 0.70
+            else:
+                cutoff = 0.78
+
+            oneri = difflib.get_close_matches(
+                kucuk,
+                sozluk_kucuk_listesi,
+                n=1,
+                cutoff=cutoff
+            )
+
+            if oneri:
+                # Kısa kelimelerde yanlış düzeltmeyi azaltmak için ilk 2 harf kontrolü
+                if len(kucuk) <= 5 and len(oneri[0]) >= 2 and kucuk[:2] != oneri[0][:2]:
+                    cache[kucuk] = token
+                    return token
+
+                yeni = sozluk_map[oneri[0]]
+
+                if yeni != token:
+                    degisiklikler.add((token, yeni))
+                    cache[kucuk] = yeni
+                    return yeni
+
+            cache[kucuk] = token
+            return token
+
+        for i, parca in enumerate(parcalar):
+            if not parca:
+                continue
+
+            # String ve yorum parçalarını değiştirme
+            if re.fullmatch(string_ve_yorum, parca):
+                continue
+
+            parcalar[i] = re.sub(kelime_deseni, duzelt, parca)
+
+        return "".join(parcalar), degisiklikler
     def _ai_kodu_duzelt(self):
-        kod = self.kod_alani.get("1.0", "end-1c").strip()
-        if not kod:
-            self._ai_mesaj_ekle("assistant", "⚠️ Düzenlenecek kod bulunamadı.")
-            return
-        prompt = f"""Aşağıdaki TürKod kodundaki hataları bul ve düzelt:
-```TürKod
-{kod}
-Yapacakların:
-- Bulduğun hataları listele
-- Düzeltilmiş kodu Türkod bloğunda ver"""
-        self._ai_gonder_prompt(prompt)
+        """Düzelt butonu: AI yerine sözlük tabanlı yerel düzeltme yapar"""
+        kod = self.kod_alani.get("1.0", "end-1c")
 
-    def _ai_kodu_acikla(self):
-        kod = self.kod_alani.get("1.0", "end-1c").strip()
-        if not kod:
-            self._ai_mesaj_ekle("assistant", "⚠️ Açıklanacak kod bulunamadı.")
+        if not kod.strip():
+            self._ai_mesaj_ekle("assistant", "⚠️ Düzeltilecek kod bulunamadı.")
             return
-        prompt = f"""Aşağıdaki TürKod kodunu satır satır açıkla ve ne yaptığını özetle:
-```TürKod
-{kod}
-```"""
-        self._ai_gonder_prompt(prompt)
 
+        yeni_kod, degisiklikler = self._kodu_yerel_duzelt(kod)
+
+        if not degisiklikler:
+            self._ai_mesaj_ekle(
+                "assistant",
+                "✅ Sözlüğe göre düzeltilecek belirgin yazım hatası bulunamadı."
+            )
+            return
+
+        self.kod_alani.delete("1.0", "end")
+        self.kod_alani.insert("1.0", yeni_kod)
+
+        self._dosya_degisti_kontrol()
+        self.sync_line_numbers()
+        self.kod_renklendir()
+
+        satirlar = ["🔧 AI yerine yerel sözlük düzeltmesi yapıldı:", ""]
+        for eski, yeni in sorted(degisiklikler):
+            satirlar.append(f"• {eski} → {yeni}")
+
+        self._ai_mesaj_ekle("assistant", "\n".join(satirlar))
+    
     def _ai_gonder_prompt(self, prompt):
         if not self.ayarlar.get("ai_aktif"):
             self._ai_mesaj_ekle("assistant", "AI aktif değil. Ayarlardan API Key girin.")
@@ -2139,9 +3319,14 @@ Yapacakların:
                 
                 cevap = f"⚠️ {saglayici} kütüphanesi yüklü değil!\n\nYüklemek için:\npip install {kutuphane_adi}"
 
-            self.after(0, lambda: self._ai_mesaj_ekle("assistant", cevap))
-            self.after(0, self._ai_yaziyor_gizle) 
+                self.after(0, lambda: self._ai_mesaj_ekle("assistant", cevap))
+                self.after(0, self._ai_yaziyor_gizle)
+                return
 
+            cevap = self._cevabi_turkceye_cevir(cevap)  # inline `kod` parçalarını da çevirir
+            self.after(0, lambda c=cevap: self._ai_mesaj_ekle("assistant", c))
+            self.after(0, self._ai_yaziyor_gizle)
+            self.after(0, lambda: self.ai_gonder_btn.configure(state="normal"))
         except Exception as e:
             hata = str(e).lower()
             hata_kodu = getattr(e, 'status_code', None) or getattr(e, 'code', None)
@@ -2196,6 +3381,7 @@ Yapacakların:
     # ============ AYARLAR PENCERESI ============
     def _ayarlar_penceresi_ac(self):
         pencere = ctk.CTkToplevel(self)
+        pencere.configure(fg_color=self.colors["bg"])
         pencere.title("Ayarlar")
         pencere.geometry("600x800")
         pencere.transient(self)
@@ -2235,19 +3421,100 @@ Yapacakların:
 
         ctk.CTkLabel(genel, text="Yazi Tipi:", font=("Segoe UI", 12, "bold"), text_color=self.colors["text"]).pack(anchor="w", pady=(10, 0), padx=10)
         yazi_var = ctk.StringVar(value=self.ayarlar.get("yazi_tipi"))
-        yazi_combo = ctk.CTkOptionMenu(
-            genel, 
-            values=["Consolas", "Courier New", "Fira Code", "JetBrains Mono", "Source Code Pro"], 
-            variable=yazi_var,
-            fg_color=self.colors.get("button_bg", "#0e639c"),
-            button_color=self.colors.get("button_hover", "#1177bb"),
-            button_hover_color=self.colors.get("button_hover", "#1177bb"),
-            dropdown_fg_color=self.colors.get("sidebar", "#252526"),
-            dropdown_hover_color=self.colors.get("selection", "#264f78"),
-            text_color=self.colors["text"],
-            dropdown_text_color=self.colors["text"]
-        )
-        yazi_combo.pack(fill="x", padx=10, pady=5)
+
+        # Tüm kurulu fontları al, önerilenleri üste taşı
+        onerilen_fontlar = ["Consolas", "Courier New", "Fira Code", "JetBrains Mono", "Source Code Pro", "Segoe UI", "Arial"]
+        tum_fontlar = sorted(set(tkfont.families()))
+        font_listesi = [f for f in onerilen_fontlar if f in tum_fontlar] + [f for f in tum_fontlar if f not in onerilen_fontlar]
+        if not font_listesi:
+            font_listesi = ["Consolas"]
+
+        def _font_secici_ac():
+            if hasattr(self, '_font_popup') and self._font_popup.winfo_exists():
+                self._font_popup.lift()
+                return
+            popup = ctk.CTkToplevel(pencere)
+            popup.title("Yazı Tipi Seç")
+            popup.geometry("320x340")
+            popup.transient(pencere)
+            popup.grab_set()
+            popup.configure(fg_color=self.colors["bg"])
+            self._font_popup = popup
+
+            # Arama çubuğu
+            arama_var = ctk.StringVar()
+            arama_entry = ctk.CTkEntry(popup, textvariable=arama_var, placeholder_text="🔍 Yazı tipi ara...",
+                                       height=32, fg_color=self.colors.get("ai_input", "#3c3c3c"),
+                                       text_color=self.colors["text"], border_color=self.colors["border"])
+            arama_entry.pack(fill="x", padx=10, pady=(10, 5))
+            arama_entry.focus_set()
+
+            # Liste çerçevesi
+            liste_frame = tk.Frame(popup, bg=self.colors["bg"])
+            liste_frame.pack(fill="both", expand=True, padx=10, pady=(0, 10))
+
+            scrollbar = ctk.CTkScrollbar(liste_frame, orientation="vertical")
+            scrollbar.pack(side="right", fill="y")
+
+            listbox = tk.Listbox(liste_frame, bg=self.colors.get("sidebar", "#252526"),
+                                 fg=self.colors["text"], selectbackground=self.colors.get("selection", "#264f78"),
+                                 selectforeground="white", font=("Segoe UI", 11), bd=0,
+                                 highlightthickness=1, highlightbackground=self.colors["border"],
+                                 activestyle="none", yscrollcommand=scrollbar.set)
+            listbox.pack(side="left", fill="both", expand=True)
+            scrollbar.configure(command=listbox.yview)
+
+            def _doldur(filtre_metni=""):
+                listbox.delete(0, tk.END)
+                filtre_metni = filtre_metni.lower()
+                for f in font_listesi:
+                    if filtre_metni in f.lower():
+                        listbox.insert(tk.END, f)
+                # Mevcut seçimi vurgula
+                mevcut = yazi_var.get()
+                for i in range(listbox.size()):
+                    if listbox.get(i) == mevcut:
+                        listbox.selection_set(i)
+                        listbox.see(i)
+                        break
+
+            def _sec(event=None):
+                secim = listbox.curselection()
+                if secim:
+                    yazi_var.set(listbox.get(secim[0]))
+                    font_btn.configure(text=yazi_var.get())
+                    popup.destroy()
+
+            def _tekerlek(event):
+                # Orta tekerlek (Button-2 sürükleme) ve normal tekerlek (MouseWheel) desteği
+                if getattr(event, "num", None) == 2 or event.type == "38":  # 38 = MouseWheel olay tipi
+                    pass
+                delta = getattr(event, "delta", 0)
+                if delta:
+                    listbox.yview_scroll(int(-1 * (delta / 120)), "units")
+                return "break"
+
+            # Orta tekerlek ile kaydırma (Windows/Linux)
+            listbox.bind("<MouseWheel>", _tekerlek)
+            listbox.bind("<Button-4>", lambda e: (listbox.yview_scroll(-3, "units"), "break"))
+            listbox.bind("<Button-5>", lambda e: (listbox.yview_scroll(3, "units"), "break"))
+            # Orta tuş basılı tutarak kaydırma
+            listbox.bind("<B2-Motion>", lambda e: (listbox.yview_moveto(e.y / listbox.winfo_height()), "break"))
+
+            arama_var.trace_add("write", lambda *a: _doldur(arama_var.get()))
+            listbox.bind("<Double-Button-1>", _sec)
+            listbox.bind("<Return>", _sec)
+            arama_entry.bind("<Return>", lambda e: (listbox.focus_set(), listbox.select_set(0) if listbox.size() else None))
+            arama_entry.bind("<Down>", lambda e: listbox.focus_set())
+
+            _doldur()
+
+        # Seçim butonu (OptionMenu yerine)
+        font_btn = ctk.CTkButton(genel, text=yazi_var.get(), command=_font_secici_ac,
+                                 fg_color=self.colors.get("button_bg", "#0e639c"),
+                                 hover_color=self.colors.get("button_hover", "#1177bb"),
+                                 text_color=self.colors["text"], anchor="w")
+        font_btn.pack(fill="x", padx=10, pady=5)
 
         ctk.CTkLabel(genel, text="Yazi Boyutu:", font=("Segoe UI", 12, "bold"), text_color=self.colors["text"]).pack(anchor="w", pady=(10, 0), padx=10)
         boyut_var = ctk.IntVar(value=self.ayarlar.get("yazi_boyutu"))
@@ -2453,7 +3720,7 @@ Yapacakların:
         ctk.CTkLabel(hakkinda, text="yusuftndgn.2@gmail.com",  
                      font=("Segoe UI", 10), text_color="#888").pack()
 
-        ctk.CTkLabel(hakkinda, text="Versiyon 1.1  |  © 2026 Tüm Hakları Saklıdır", 
+        ctk.CTkLabel(hakkinda, text="Versiyon 2.0  |  © 2026 Tüm Hakları Saklıdır", 
                      font=("Segoe UI", 10), text_color="#666").pack(pady=(0, 10))
 
         # ===== RSA DİJİTAL İMZA KUTUSU =====
@@ -2564,7 +3831,7 @@ Yapacakların:
                 self._sync_minimap()
             else:
                 self.minimap.grid_forget()
-                
+            self.sync_line_numbers()
             self._tema_uygula()
             pencere.destroy()
 
@@ -2576,7 +3843,8 @@ Yapacakların:
 
     def _tema_uygula(self):
         self.configure(fg_color=self.colors["bg"])
-        
+        if hasattr(self, "terminal_grip"):
+            self.terminal_grip.configure(fg_color=self.colors["border"])
         # Aktivite Çubuğu (Activity Bar)
         if hasattr(self, 'activity_bar'):
             self.activity_bar.configure(fg_color=self.colors.get("activity_bar", self.colors["sidebar"]))
@@ -2611,6 +3879,10 @@ Yapacakların:
         self.dosya_tree.tag_configure("other", foreground=self.colors["panel_fg"])
 
         # TAB BAR & SEKMELER
+        for btn in (getattr(self, "tab_left_btn", None), getattr(self, "tab_right_btn", None)):
+            if btn:
+                btn.configure(text_color=self.colors["text"],
+                              hover_color=self.colors["tab_active"])
         self.tab_bar.configure(fg_color=self.colors.get("tab_inactive", "#f3f3f3"))
         
         for sekme in self.sekmeler:
@@ -2621,28 +3893,47 @@ Yapacakların:
             )
             sekme["label"].configure(text_color=self.colors["text"])
             sekme["kapat_btn"].configure(text_color=self.colors["text"])
-            
-        # HAKKIMDA PANELİ (eğer açıksa veya referans varsa)
-        if hasattr(self, 'rsa_frame') and self.rsa_frame.winfo_exists():
-            self.rsa_frame.configure(fg_color=self.colors["sidebar"], border_color=self.colors["border"])
-        if hasattr(self, 'rsa_durum') and self.rsa_durum.winfo_exists():
-            self.rsa_durum.configure(text_color=self.colors["panel_fg"])
-        if hasattr(self, 'rsa_detay') and self.rsa_detay.winfo_exists():
-            self.rsa_detay.configure(text_color="#666")
+
+        # === TERMİNAL ===
+        if hasattr(self, 'terminal_frame') and self.terminal_frame.winfo_exists():
+            self.terminal_frame.configure(fg_color=self.colors["panel_bg"])
+
+            for child in self.terminal_frame.winfo_children():
+                # Üst başlık çubuğu
+                if isinstance(child, ctk.CTkFrame):
+                    child.configure(fg_color=self.colors["sidebar"])
+                    for w in child.winfo_children():
+                        if isinstance(w, ctk.CTkLabel):
+                            w.configure(text_color=self.colors["panel_fg"])
+                        elif isinstance(w, ctk.CTkButton):
+                            w.configure(text_color=self.colors["text"])
+                # Çıktı alanı
+                elif isinstance(child, ctk.CTkTextbox):
+                    child.configure(fg_color=self.colors["bg"],
+                                    text_color=self.colors["text"])
+                # Komut satırı
+                elif isinstance(child, ctk.CTkEntry):
+                    child.configure(fg_color=self.colors["ai_input"],
+                                    text_color=self.colors["text"],
+                                    border_color=self.colors["border"])
             
         # EDİTÖR FONT GÜNCELLEME
-        yeni_font = (self.ayarlar.get("yazi_tipi"), self.ayarlar.get("yazi_boyutu"))
+        yazi_tipi = self.ayarlar.get("yazi_tipi")
+        if yazi_tipi not in set(tkfont.families()):
+            yazi_tipi = "Consolas"
+            self.ayarlar.set("yazi_tipi", yazi_tipi)
+
+        yeni_font = (yazi_tipi, self.ayarlar.get("yazi_boyutu"))
         self.kod_alani.configure(font=yeni_font)
         self.line_numbers.configure(font=yeni_font)
-        
-        if hasattr(self, 'minimap') and self.minimap.winfo_exists():
-            self.minimap.configure(font=(self.ayarlar.get("yazi_tipi"), 4))
             
         # Tab Butonları
         self.yeni_sekme_btn.configure(fg_color=self.colors["button_bg"], hover_color=self.colors["button_hover"], border_color=self.colors["border"])
         self.ac_btn.configure(fg_color=self.colors["button_bg"], hover_color=self.colors["button_hover"], border_color=self.colors["border"])
         self.kaydet_btn.configure(fg_color=self.colors["button_bg"], hover_color=self.colors["button_hover"], border_color=self.colors["border"])
-        self.calistir_btn.configure(border_color=self.colors["border"]) 
+        self.calistir_btn.configure(border_color=self.colors["border"])
+        self.cevir_btn.configure(fg_color=self.colors["button_bg"],
+        hover_color=self.colors["button_hover"], border_color=self.colors["border"])
         
         # EDİTÖR ALANI
         self.editor_frame.configure(fg_color=self.colors["bg"])
@@ -2664,6 +3955,15 @@ Yapacakların:
         self.ai_input_frame.configure(fg_color=self.colors["ai_input"])
         self.ai_input.configure(fg_color="transparent", text_color=self.colors["text"])
         self.ai_gonder_btn.configure(fg_color=self.colors["button_bg"], hover_color=self.colors["button_hover"])
+        # AI sohbetini yeni temayla yeniden çiz
+        if hasattr(self, 'ai_chat_frame') and self.ai_chat_frame.winfo_exists():
+            kayitli = list(getattr(self, 'ai_mesajlar', []))
+            for widget in self.ai_chat_frame.winfo_children():
+                if widget is not getattr(self, 'ai_typing_frame', None):
+                    widget.destroy()
+            self.ai_mesajlar = []
+            for m in kayitli:
+                self._ai_mesaj_ekle(m["gonderen"], m["mesaj"])
         if hasattr(self, 'ai_typing_frame') and self.ai_typing_frame.winfo_exists():
             self.ai_typing_frame.configure(fg_color=self.colors["ai_assistant"])
         # Alt Durum Çubuğu (Status Bar)
@@ -2845,21 +4145,49 @@ Yapacakların:
                 text_color="#666"
             )
     # ============ EDITOR FONKSIYONLARI ============
+    def _gorsel_satir_adedi(self, satir):
+        kod_tb = getattr(self.kod_alani, "_textbox", self.kod_alani)
+        try:
+            n = kod_tb.count(f"{satir}.0", f"{satir + 1}.0", "displaylines")
+            if isinstance(n, (tuple, list)):
+                n = n[0]
+            return max(1, int(n or 1))
+        except Exception:
+            return 1
+
+    def _satir_numaralarini_ciz(self):
+        gizli = self._gizli_satirlar()
+        self.line_numbers.configure(state="normal")
+        self.line_numbers.delete("1.0", "end")
+        satir_sayisi = int(self.kod_alani.index("end-1c").split(".")[0])
+        for i in range(1, satir_sayisi + 1):
+            if i in gizli:
+                continue                      # katlanmış satırın numarası çizilmez
+            ikon = ""
+            if i in getattr(self, "fold_indicators", {}):
+                ikon = self.fold_indicators[i] + " "
+            self.line_numbers.insert("end", f"{ikon}{i}\n")
+            for _ in range(self._gorsel_satir_adedi(i) - 1):
+                self.line_numbers.insert("end", "\n")
+        self.line_numbers.configure(state="disabled")
+    def _gutter_rakamini_oku(self, event):
+        """Tıklanan gutter satırındaki gerçek satır numarasını ve sütunu döndürür"""
+        ln = getattr(self.line_numbers, "_textbox", self.line_numbers)
+        idx = ln.index(f"@{event.x},{event.y}")
+        g_satir, sutun = idx.split(".")
+        metin = ln.get(f"{g_satir}.0", f"{g_satir}.end")
+        m = re.search(r"\d+", metin)
+        if not m:
+            return None, None
+        return int(m.group(0)), int(sutun)
+
     def sync_line_numbers(self):
         try:
-            satir_sayisi = int(self.kod_alani.index("end-1c").split(".")[0])
-            self.line_numbers.configure(state="normal")
-            self.line_numbers.delete("1.0", "end")
-            numara_metni = "\n".join(str(i) for i in range(1, satir_sayisi + 1))
-            self.line_numbers.insert("1.0", numara_metni)
-            self.line_numbers.configure(state="disabled")
-            
-            self._senkronize_scroll()
-            self._sync_minimap() 
-            
+            self._fold_guncelle()          # numaraları da yeniden çizer
+            self._senkronize_scroll()      # çizimden SONRA senkron
+            self._sync_minimap()
         except Exception:
             pass
-
     def _sync_minimap(self):
         """Minimap textini ana editorle senkronize et"""
         if not self.ayarlar.get("minimap") or not hasattr(self, 'minimap'):
@@ -2876,36 +4204,69 @@ Yapacakların:
             self.minimap.yview_moveto(first)
         except Exception:
             pass
-
+    
     def kod_renklendir(self):
         try:
-            for tag in ["keyword", "builtin", "string", "comment", "number"]:
-                self.kod_alani.tag_remove(tag, "1.0", "end")
+            tb = getattr(self.kod_alani, "_textbox", self.kod_alani)
 
-            metin = self.kod_alani.get("1.0", "end")
+            # 1) Eski tag'leri temizle (fstring ve bosluk dahil)
+            for tag in ("keyword", "builtin", "string", "comment", "number", "fstring", "bosluk"):
+                tb.tag_remove(tag, "1.0", "end")
 
-            keyword_pattern = r"\b(fonksiyon|dondur|sinif|eger|degilse_eger|degilse|dongu|kir|devam_et|gec|dene|hata_yakala|sonunda|ice_aktar|den|olarak|ve|veya|degil|eszamansiz|bekle|verim|kuresel|yerel_olmayan|sil|ile)\b"
-            builtin_pattern = r"\b(yazdir|girdi_al|uzunluk|aralik|tip|en_buyuk|en_kucuk|toplam|mutlak|tamsayi|metin|ondalikli|mantiksal|liste|sozluk|tarih_saat|rastgele|matematik|simdi|ekle|sirala|karekok|kaplumbaga|ileri|geri|saga_don|sola_don|kalem_birak|kalem_kaldir|tkinter_arayuz|dugme|pencere|hepsi|herhangi|ascii_goster|ikili|kirma_noktasi|byte_dizisi|byte|cagrilabilir_mi|karakter|sinif_metodu|derle|karmasik|ozellik_sil|dizin|bolum_kalan|sirali_numaralandir|degerlendir|calistir|suz|icindekiler|donmus_kume|ozellik_al|kuresel_degiskenler|ozellik_var_mi|ozet|yardim|onaltilik|kimlik|alt_sinif_mi|yineleyici|yerel_degiskenler|harita|hafiza_gorunumu|sonraki|nesne|sekizlik|sirala_builtin|ters_cevir_builtin|temsil|ozellik_ayarla|dilim|durum_metodu|ust_sinif|degiskenler|izdusum|ice_aktar_builtin|bas_harf_buyuk|kucult_karsilastir|ortele|kodla|genislet_sekme|bul|bicimle|bicimle_harita|harf_sayi_mi|harf_mi|ascii_mi|onluk_mu|rakam_mi|tanimlayici_mi|kucuk_mu|sayi_mi|yazilabilir_mi|bosluk_mu|baslik_mi|buyuk_mu|sola_yasla|sol_kirp|cevirim_tablo|bolumle|on_ek_kaldir|son_ek_kaldir|sagdan_bul|sagdan_indeks|saga_yasla|sagdan_bolumle|sagdan_bol|sag_kirp|satir_bol|harf_degistir|baslik_yap|cevir|sifir_doldur|anahtardan_olustur|son_ogeyi_cikart|varsayilan_ayarla|guncelle|ekle_kume|fark|fark_guncelle|at|kesisim|kesisim_guncelle|ayrik_mi|alt_kume_mi|ust_kume_mi|bakirisim|bakirisim_guncelle|birlesim|kume_guncelle|kapat|oku|satir_oku|satirlari_oku|konumla|kacinci_byte|kisalt|yaz|satirlari_yaz|tampon_temizle|okunabilir_mi|yazilabilir_mi_dosya|konumlanabilir_mi|etiket|metin_kutusu|metin_alani|cerceve|liste_kutusu|menu|yeni_pencere|checkbutton|radiobutton|scale|scrollbar|spinbox|canvas|messagebox|filedialog|colorchooser|pack|grid|yerlestir|mainloop|after|destroy|configure|config|isletim_sistemi|bulundugu_dizin|dizin_degistir|dizin_listele|dizin_olustur|dizinler_olustur|dosya_sil|dizin_sil|yeniden_adlandir|yol_var_mi|dosya_mi|dizin_mi|yol_birlestir|dosya_adi|dizin_adi|tam_yol|yol_ayir|cevre_degiskenleri|sistem_calistir|cevre_al|sistem|argumanlar|cikis|yol_listesi|platform|surum|standart_cikis|standart_giris|standart_hata|boyut_al|zaman_modulu|buyu|anlik_zaman|yerel_zaman|greenwich_zaman|zaman_bicimle|zaman_ayristir|performans_sayaci|monotonik_sayac|json|json_yukle|json_yukle_metin|json_kaydet|json_kaydet_metin|desen|eslestir|ara|hepsini_bul|yineleyici_bul|desen_bol|desen_degistir|desen_degistir_say|desen_derle|kacis)\b"
-            string_pattern = r"\"[^\"\\]*(\\.[^\"\\]*)*\"|\'[^\'\\]*(\\.[^\'\\]*)*\'"
-            comment_pattern = r"#.*"
-            number_pattern = r"\b\d+\.?\d*\b"
-
-            desenler = {
-                "keyword": keyword_pattern,
-                "builtin": builtin_pattern,
-                "string": string_pattern,
-                "comment": comment_pattern,
-                "number": number_pattern
-            }
+            metin = self.kod_alani.get("1.0", "end-1c")
+            if not metin:
+                return
 
             def tk_idx(pos):
                 satir = metin.count("\n", 0, pos) + 1
                 sutun = pos - metin.rfind("\n", 0, pos) - 1
                 return f"{satir}.{sutun}"
 
-            for tag_adi, desen in desenler.items():
-                for match in re.finditer(desen, metin):
-                    self.kod_alani.tag_add(tag_adi, tk_idx(match.start()), tk_idx(match.end()))
+            string_pattern = (
+                r'(?<![A-Za-z0-9_])'
+                r'([fF]?(\"\"\"[\s\S]*?\"\"\"|\'\'\'[\s\S]*?\'\'\''
+                r'|"(?:[^"\\\n]|\\.)*"?|\'(?:[^\'\\\n]|\\.)*\'?))'
+            )
+            comment_pattern = r'#[^\n]*'
+            keyword_pattern = r"\b(fonksiyon|dondur|sinif|eger|degilse_eger|degilse|dongu|kir|devam_et|gec|dene|hata_yakala|sonunda|ice_aktar|den|olarak|ve|veya|degil|eszamansiz|bekle|verim|kuresel|yerel_olmayan|sil|ile)\b"
+            builtin_pattern = r"\b(yazdir|girdi_al|uzunluk|aralik|tip|en_buyuk|en_kucuk|toplam|mutlak|tamsayi|metin|ondalikli|mantiksal|liste|sozluk|tarih_saat|rastgele|matematik|simdi|ekle|sirala|karekok|kaplumbaga|ileri|geri|saga_don|sola_don|kalem_birak|kalem_kaldir|tkinter_arayuz|dugme|pencere|hepsi|herhangi|ascii_goster|ikili|kirma_noktasi|byte_dizisi|byte|cagrilabilir_mi|karakter|sinif_metodu|derle|karmasik|ozellik_sil|dizin|bolum_kalan|sirali_numaralandir|degerlendir|calistir|suz|icindekiler|donmus_kume|ozellik_al|kuresel_degiskenler|ozellik_var_mi|ozet|yardim|onaltilik|kimlik|alt_sinif_mi|yineleyici|yerel_degiskenler|harita|hafiza_gorunumu|sonraki|nesne|sekizlik|sirala_builtin|ters_cevir_builtin|temsil|ozellik_ayarla|dilim|durum_metodu|ust_sinif|degiskenler|izdusum|ice_aktar_builtin|bas_harf_buyuk|kucult_karsilastir|ortele|kodla|genislet_sekme|bul|bicimle|bicimle_harita|harf_sayi_mi|harf_mi|ascii_mi|onluk_mu|rakam_mi|tanimlayici_mi|kucuk_mu|sayi_mi|yazilabilir_mi|bosluk_mu|baslik_mi|buyuk_mu|sola_yasla|sol_kirp|cevirim_tablo|bolumle|on_ek_kaldir|son_ek_kaldir|sagdan_bul|sagdan_indeks|saga_yasla|sagdan_bolumle|sagdan_bol|sag_kirp|satir_bol|harf_degistir|baslik_yap|cevir|sifir_doldur|anahtardan_olustur|son_ogeyi_cikart|varsayilan_ayarla|guncelle|ekle_kume|fark|fark_guncelle|at|kesisim|kesisim_guncelle|ayrik_mi|alt_kume_mi|ust_kume_mi|bakirisim|bakirisim_guncelle|birlesim|kume_guncelle|kapat|oku|satir_oku|satirlari_oku|konumla|kacinci_byte|kisalt|yaz|satirlari_yaz|tampon_temizle|okunabilir_mi|yazilabilir_mi_dosya|konumlanabilir_mi|etiket|metin_kutusu|metin_alani|cerceve|liste_kutusu|menu|yeni_pencere|checkbutton|radiobutton|scale|scrollbar|spinbox|canvas|messagebox|filedialog|colorchooser|pack|grid|yerlestir|mainloop|after|destroy|configure|config|isletim_sistemi|bulundugu_dizin|dizin_degistir|dizin_listele|dizin_olustur|dizinler_olustur|dosya_sil|dizin_sil|yeniden_adlandir|yol_var_mi|dosya_mi|dizin_mi|yol_birlestir|dosya_adi|dizin_adi|tam_yol|yol_ayir|cevre_degiskenleri|sistem_calistir|cevre_al|sistem|argumanlar|cikis|yol_listesi|platform|surum|standart_cikis|standart_giris|standart_hata|boyut_al|zaman_modulu|buyu|anlik_zaman|yerel_zaman|greenwich_zaman|zaman_bicimle|zaman_ayristir|performans_sayaci|monotonik_sayac|json|json_yukle|json_yukle_metin|json_kaydet|json_kaydet_metin|desen|eslestir|ara|hepsini_bul|yineleyici_bul|desen_bol|desen_degistir|desen_degistir_say|desen_derle|kacis)\b"
+            number_pattern = r'\b\d+(?:\.\d+)?\b'
+
+            # 2) String'ler ve f-string'ler (üçlü tırnak dahil)
+            string_araliklari = []
+            for m in re.finditer(string_pattern, metin):
+                string_araliklari.append((m.start(), m.end()))
+                tag = "fstring" if m.group(1)[:1] in "fF" else "string"
+                tb.tag_add(tag, tk_idx(m.start()), tk_idx(m.end()))
+
+            # 3) Yorumlar (string içindeki # yok sayılır)
+            korunacak = list(string_araliklari)
+            for m in re.finditer(comment_pattern, metin):
+                if any(s <= m.start() < e for s, e in string_araliklari):
+                    continue
+                korunacak.append((m.start(), m.end()))
+                tb.tag_add("comment", tk_idx(m.start()), tk_idx(m.end()))
+
+            def disinda(a, b):
+                return not any(s <= a and b <= e for s, e in korunacak)
+
+            # 4) Keyword / builtin / sayı (string ve yorum dışındakiler)
+            for m in re.finditer(keyword_pattern, metin):
+                if disinda(m.start(), m.end()):
+                    tb.tag_add("keyword", tk_idx(m.start()), tk_idx(m.end()))
+            for m in re.finditer(builtin_pattern, metin):
+                if disinda(m.start(), m.end()):
+                    tb.tag_add("builtin", tk_idx(m.start()), tk_idx(m.end()))
+            for m in re.finditer(number_pattern, metin):
+                if disinda(m.start(), m.end()):
+                    tb.tag_add("number", tk_idx(m.start()), tk_idx(m.end()))
+
+            # 5) Boşluk göstergesi (ayar açıksa)
+            if self.ayarlar.get("bosluk_gostergesi"):
+                tb.tag_config("bosluk", underline=True,
+                              foreground=self.colors.get("line_number", "#858585"))
+                for m in re.finditer(r'[ \t]+', metin):
+                    tb.tag_add("bosluk", tk_idx(m.start()), tk_idx(m.end()))
         except Exception:
             pass
 
@@ -3020,25 +4381,122 @@ Yapacakların:
                 return "break"
         self.popup_kapat()
         return None
-
+    def _turkce_karakter_kontrol(self):
+        """Türkçe karakter içeren değişken/fonksiyon isimlerini uyarı olarak işaretle"""
+        try:
+            self.kod_alani.tag_remove("turkce_uyari", "1.0", "end")
+            
+            turkce_harfler = "çğıöşüÇĞİÖŞÜ"
+            kod = self.kod_alani.get("1.0", "end-1c")
+            
+            # Değişken/fonksiyon tanımlarını bul
+            import re
+            
+            # fonksiyon isim(...)
+            for match in re.finditer(r'fonksiyon\s+([a-zA-Z_çğıöşüÇĞİÖŞÜ][a-zA-Z0-9_çğıöşüÇĞİÖŞÜ]*)', kod):
+                isim = match.group(1)
+                if any(h in isim for h in turkce_harfler):
+                    # Satır ve sütun bul
+                    satir = kod[:match.start(1)].count('\n') + 1
+                    satir_bas = kod.rfind('\n', 0, match.start(1)) + 1
+                    sutun = match.start(1) - satir_bas
+                    self.kod_alani.tag_add("turkce_uyari", f"{satir}.{sutun}", f"{satir}.{sutun + len(isim)}")
+            
+            # değişken = ...
+            for match in re.finditer(r'^([a-zA-Z_çğıöşüÇĞİÖŞÜ][a-zA-Z0-9_çğıöşüÇĞİÖŞÜ]*)\s*=', kod, re.MULTILINE):
+                isim = match.group(1)
+                if any(h in isim for h in turkce_harfler):
+                    satir = kod[:match.start(1)].count('\n') + 1
+                    satir_bas = kod.rfind('\n', 0, match.start(1)) + 1
+                    sutun = match.start(1) - satir_bas
+                    self.kod_alani.tag_add("turkce_uyari", f"{satir}.{sutun}", f"{satir}.{sutun + len(isim)}")
+            
+            # Stil
+            self.kod_alani.tag_config("turkce_uyari", underline=True, foreground="#ff9800")
+            
+        except Exception:
+            pass
     def on_key_release(self, event):
         if event.keysym in ["Up", "Down", "Return", "Tab", "Escape"]:
             return
         
-        # ⬅️ YENİ: Kod değiştiğinde tanımları güncelle (her 10 saniyede bir)
         self.kod_renklendir()
         kelime, bas, bit = self.mevcut_kelimeyi_al()
         if kelime:
             self.popup_goster(kelime, bas, bit)
         else:
             self.popup_kapat()
-    def on_tab_key(self, event):
-        if self.popup:
-            return self.kelime_tamamla()
-        else:
+        
+        # Syntax kontrolü - önceki timer'ı iptal et
+        if hasattr(self, '_syntax_timer') and self._syntax_timer:
+            self.after_cancel(self._syntax_timer)
+        self._syntax_timer = self.after(500, self._syntax_kontrol)
+        
+        # Türkçe karakter uyarısı
+        self._turkce_karakter_kontrol()
+    def _syntax_kontrol(self):
+        """Kodu AST ile kontrol et, hatalı satırları kırmızı alt çizgi ile işaretle"""
+        try:
+            # Önceki hata etiketlerini temizle
+            self.kod_alani.tag_remove("syntax_hata", "1.0", "end")
+            
+            turkce_kod = self.kod_alani.get("1.0", "end-1c")
+            if not turkce_kod.strip():
+                return
+            
+            # TürKod'u Python'a çevir
+            python_kodu = turkce_kodu_donustur(turkce_kod)
+            
+            # AST parse dene
+            import ast
+            try:
+                ast.parse(python_kodu)
+                self.status_left.configure(text="  ✓ Sözdizimi doğru")
+                return
+            except SyntaxError as e:
+                if e.lineno:
+                    hata_satir = e.lineno
+                    self.kod_alani.tag_add("syntax_hata", f"{hata_satir}.0", f"{hata_satir}.end")
+                    self.status_left.configure(text=f"  ⚠ Sözdizimi hatası: Satır {hata_satir}")
+            
+            # Hata etiketi stili
+            renk = "#ffdcdc" if self.tema == "Açık" else "#5a1d1d"
+            self.kod_alani.tag_config("syntax_hata", background=renk, underline=True)
+            
+        except Exception:
+            pass
+    def _tab_indent(self, event=None):
+        """Tab: Seçili satırları sağa kaydır, yoksa otomatik tamamlama veya boşluk"""
+        try:
+            if self.popup:
+                return self.kelime_tamamla()
+            
+            # Seçili metin var mı?
+            if self.kod_alani.tag_ranges("sel"):
+                bas = self.kod_alani.index("sel.first")
+                bit = self.kod_alani.index("sel.last")
+                bas_satir = int(bas.split(".")[0])
+                bit_satir = int(bit.split(".")[0])
+                
+                # Her satırın başına 4 boşluk ekle
+                for satir_no in range(bas_satir, bit_satir + 1):
+                    self.kod_alani.insert(f"{satir_no}.0", "    ")
+                
+                # Seçimi güncelle
+                yeni_bas = f"{bas_satir}.0"
+                yeni_bit = f"{bit_satir}.end"
+                self.kod_alani.tag_remove("sel", "1.0", "end")
+                self.kod_alani.tag_add("sel", yeni_bas, yeni_bit)
+                
+                self.sync_line_numbers()
+                return "break"
+            else:
+                # Normal tab davranışı (otomatik tamamlama veya 4 boşluk)
+                self.kod_alani.insert("insert", "    ")
+                return "break"
+        except Exception:
             self.kod_alani.insert("insert", "    ")
             return "break"
-
     def on_return_key(self, event):
         if self.popup:
             return self.kelime_tamamla()
@@ -3051,6 +4509,7 @@ Yapacakların:
                 self.listbox.select_clear(0, tk.END)
                 self.listbox.select_set(sonraki)
             return "break"
+        return None  # ← Ekle: Popup yoksa imleç normal hareket etsin
 
     def on_arrow_up(self, event):
         if self.popup and self.listbox:
@@ -3060,12 +4519,46 @@ Yapacakların:
                 self.listbox.select_clear(0, tk.END)
                 self.listbox.select_set(onceki)
             return "break"
+        return None  # ← Ekle
 
     def dosya_ac(self):
         path = filedialog.askopenfilename(title="Dosya Seç", filetypes=[("Türkçe Python", "*.trpy")])
         if path:
             self._yeni_sekme_olustur(yol=path)
+    def _kod_dili_tespit(self, kod):
+        """Puanlama ile tespit: TürKod mu Python mu?"""
+        turkod = len(re.findall(
+            r"\b(fonksiyon|dondur|sinif|eger|degilse_eger|degilse|dongu|icinde|"
+            r"yazdir|girdi_al|ice_aktar|dene|hata_yakala|sonunda|kir|devam_et)\b", kod))
+        python = len(re.findall(
+            r"\b(def|return|class|if|elif|else|for|while|print|input|import|"
+            r"from|try|except|finally|break|continue)\b", kod))
+        if turkod == python:
+            return "turkod"
+        return "turkod" if turkod > python else "python"
 
+    def _kodu_cevir(self, event=None):
+        kod = self.kod_alani.get("1.0", "end-1c")
+        if not kod.strip():
+            self.status_left.configure(text="  Çevrilecek kod yok.")
+            return "break"
+
+        dil = self._kod_dili_tespit(kod)
+
+        if dil == "turkod":
+            sonuc = turkce_kodu_donustur(kod)
+            kaynak, hedef, uzanti = "TürKod", "Python", ".py"
+        else:
+            sonuc = python_kodu_turkceye_cevir(kod)
+            kaynak, hedef, uzanti = "Python", "TürKod", ".trpy"
+
+        # Orijinal bozulmasın diye sonucu yeni sekmede aç
+        sekme = self._aktif_sekme()
+        taban = os.path.splitext(sekme["isim"])[0] if sekme else "cevrilmis"
+        self._yeni_sekme_olustur(isim=taban + uzanti, icerik=sonuc)
+
+        self.status_left.configure(text=f"  {kaynak} → {hedef} çevrildi, yeni sekmede açıldı.")
+        return "break"
     def dosya_kaydet(self):
         sekme = self._aktif_sekme()
         if not sekme:
@@ -3150,20 +4643,215 @@ Yapacakların:
                 python_exe = python_exe.replace("pythonw.exe", "python.exe")
 
         # ==================== CALISTIRMA ====================
-        if os.name == "nt":
-            self._calistirma_process = subprocess.Popen(
-                [python_exe, "-X", "utf8", "-i", runner_path],
-                cwd=temp_dir,
-                creationflags=subprocess.CREATE_NEW_CONSOLE
-            )
-        else:
-            subprocess.Popen(
-                ["gnome-terminal", "--", python_exe, "-X", "utf8", "-i", runner_path],
-                cwd=temp_dir
-            )
-        
-        self.status_left.configure(text="  Kod calistiriliyor...")
+        if not self.terminal_visible:
+            self._terminal_toggle()
+        self._terminal_yazdir(f"\n> python -u runner.py\n")
 
+        cf = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+        self._calistirma_process = subprocess.Popen(
+            [python_exe, "-X", "utf8", "-u", runner_path],
+            cwd=temp_dir,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            stdin=subprocess.PIPE,
+            text=True, encoding="utf-8", errors="replace",
+            creationflags=cf
+        )
+        threading.Thread(target=self._terminal_oku, args=(self._calistirma_process,), daemon=True).start()
+        self.status_left.configure(text="  Kod calistiriliyor...")
+    # ============ ENTEGRE TERMİNAL ============
+    def _terminal_toggle(self, event=None):
+        if getattr(self, "terminal_visible", False):
+            self.terminal_frame.grid_remove()
+            self.terminal_grip.grid_remove()
+            self.terminal_visible = False
+        else:
+            self.terminal_grip.grid(row=2, column=3, sticky="ew")
+            self.terminal_frame.grid(row=3, column=3, sticky="nsew")
+            self.terminal_visible = True
+        return "break"
+    def _terminal_grip_basla(self, event):
+        self._tg_baslangic_y = event.y_root
+        self._tg_baslangic_h = self.terminal_frame.winfo_height()
+        self._grip_aktif = True
+
+    def _terminal_grip_surukle(self, event):
+        if not self._grip_aktif:
+            return
+        delta = self._tg_baslangic_y - event.y_root   # yukarı çek = büyüt
+        yeni = max(80, min(600, self._tg_baslangic_h + delta))
+        y_pos = self.terminal_frame.winfo_y() - (yeni - self._tg_baslangic_h)
+        self._ghost_line_y.place(x=self.editor_frame.winfo_x(), y=y_pos,
+                                 width=self.editor_frame.winfo_width(), height=2)
+        self._ghost_line_y.lift()
+        self._tg_yeni = yeni
+
+    def _terminal_grip_birak(self, event):
+        if not self._grip_aktif:
+            return
+        self._grip_aktif = False
+        self._ghost_line_y.place_forget()
+        yeni = getattr(self, "_tg_yeni", self.terminal_frame.winfo_height())
+        self.terminal_frame.configure(height=int(yeni))
+        self.grid_rowconfigure(3, minsize=int(yeni))
+        self.update_idletasks()
+    def _terminal_yazdir(self, metin):
+        self.terminal_output.configure(state="normal")
+        self.terminal_output.insert("end", metin)
+        self.terminal_output.see("end")
+        self.terminal_output.configure(state="disabled")
+
+    def _terminal_temizle(self):
+        self.terminal_output.configure(state="normal")
+        self.terminal_output.delete("1.0", "end")
+        self.terminal_output.configure(state="disabled")
+
+    def _terminal_enter(self, event=None):
+        komut = self.terminal_input.get().strip()
+        self.terminal_input.delete(0, "end")
+        if not komut:
+            return "break"
+
+        self._terminal_yazdir(f"> {komut}\n")
+
+        proc = getattr(self, "_calistirma_process", None)
+        # Kod çalışıyorsa yazılanı input()'a gönder
+        if proc is not None and proc.poll() is None and proc.stdin:
+            try:
+                proc.stdin.write(komut + "\n")
+                proc.stdin.flush()
+            except Exception:
+                pass
+            return "break"
+
+        # Kod çalışmıyorsa sistem komutu olarak çalıştır
+        threading.Thread(target=self._terminal_komut_calistir, args=(komut,), daemon=True).start()
+        return "break"
+
+    def _terminal_komut_calistir(self, komut):
+        try:
+            cf = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+            cwd = self.proje_dizini if self.proje_dizini and os.path.exists(self.proje_dizini) else os.getcwd()
+            sonuc = subprocess.run(
+                komut, shell=True, cwd=cwd,
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                text=True, encoding="utf-8", errors="replace",
+                creationflags=cf
+            )
+            self.after(0, self._terminal_yazdir, (sonuc.stdout or "") + "\n")
+        except Exception as e:
+            self.after(0, self._terminal_yazdir, f"[Hata: {e}]\n")
+
+    def _terminal_oku(self, process):
+        import codecs
+        cozucu = codecs.getincrementaldecoder("utf-8")("replace")
+        fd = process.stdout.fileno()
+        try:
+            while True:
+                ham = os.read(fd, 4096)   # \n beklemez, veri gelince döner
+                if not ham:
+                    break
+                metin = cozucu.decode(ham)
+                if metin:
+                    self.after(0, self._terminal_yazdir, metin)
+            kalan = cozucu.decode(b"", final=True)
+            if kalan:
+                self.after(0, self._terminal_yazdir, kalan)
+            kod = process.wait()
+            self.after(0, self._terminal_yazdir, f"\n[Process {kod} koduyla çıktı]\n")
+        except Exception as e:
+            self.after(0, self._terminal_yazdir, f"[Terminal okuma hatası: {e}]\n")
+        finally:
+            self._calistirma_process = None
+    def _pencere_kapat(self):
+        degisikler = [s for s in self.sekmeler if s["degisti"]]
+        if degisikler:
+            isimler = ", ".join(s["isim"] for s in degisikler)
+            cevap = messagebox.askyesnocancel("Çıkış",
+                f"Kaydedilmemiş dosyalar: {isimler}\nKaydedilsin mi?")
+            if cevap is None:
+                return
+            if cevap:
+                for s in degisikler:
+                    if s["yol"]:
+                        icerik = self.kod_alani.get("1.0", "end-1c") if s["id"] == self.aktif_sekme_id else s["icerik"]
+                        try:
+                            with open(s["yol"], "w", encoding="utf-8") as f:
+                                f.write(icerik)
+                        except Exception:
+                            pass
+        self.destroy()
+class BasitDebugger:
+    """Basit satır satır hata ayıklayıcı"""
+    
+    def __init__(self, ide):
+        self.ide = ide
+        self.breakpoints = set()  # {satir_no}
+        self.calistiriliyor = False
+        self.mevcut_satir = 0
+        self._highlight_tag = "breakpoint"
+        self._current_tag = "debug_current"
+    
+    def breakpoint_toggle(self, satir):
+        """Satırda breakpoint aç/kapat"""
+        if satir in self.breakpoints:
+            self.breakpoints.remove(satir)
+            self.ide.kod_alani.tag_remove(self._highlight_tag, f"{satir}.0", f"{satir}.end")
+        else:
+            self.breakpoints.add(satir)
+            self.ide.kod_alani.tag_add(self._highlight_tag, f"{satir}.0", f"{satir}.end")
+            renk = "#ffdcdc" if self.tema == "Açık" else "#5a1d1d"
+            self.ide.kod_alani.tag_config(self._highlight_tag, background=renk)
+    def baslat(self):
+        """Debugger'ı başlat"""
+        if not self.breakpoints:
+            messagebox.showwarning("Debugger", "Önce breakpoint ekleyin! (Satır numarasına tıklayın)")
+            return
+        
+        self.calistiriliyor = True
+        self.mevcut_satir = min(self.breakpoints)
+        self._vurgula(self.mevcut_satir)
+        self.ide.status_left.configure(text=f"  ⏸ Debugger: Satır {self.mevcut_satir}")
+    
+    def adim(self):
+        """Bir sonraki satıra geç"""
+        if not self.calistiriliyor:
+            return
+        
+        self._vurgula_kaldir(self.mevcut_satir)
+        
+        # Sonraki breakpoint veya satır
+        sonraki = sorted([b for b in self.breakpoints if b > self.mevcut_satir])
+        if sonraki:
+            self.mevcut_satir = sonraki[0]
+            self._vurgula(self.mevcut_satir)
+            self.ide.status_left.configure(text=f"  ⏸ Debugger: Satır {self.mevcut_satir}")
+        else:
+            self.durdur()
+    
+    def devam_et(self):
+        """Sonraki breakpoint'e kadar çalıştır"""
+        if not self.calistiriliyor:
+            self.baslat()
+            return
+        self.adim()
+    
+    def durdur(self):
+        """Debugger'ı durdur"""
+        self.calistiriliyor = False
+        if self.mevcut_satir:
+            self._vurgula_kaldir(self.mevcut_satir)
+        self.ide.status_left.configure(text="  ■ Debugger durduruldu")
+    
+    def _vurgula(self, satir):
+        """Mevcut satırı vurgula"""
+        self.ide.kod_alani.tag_add(self._current_tag, f"{satir}.0", f"{satir}.end")
+        self.ide.kod_alani.tag_config(self._current_tag, background="#264f78")
+        self.ide.kod_alani.see(f"{satir}.0")
+    
+    def _vurgula_kaldir(self, satir):
+        """Vurguyu kaldır"""
+        self.ide.kod_alani.tag_remove(self._current_tag, f"{satir}.0", f"{satir}.end")
 if __name__ == "__main__":
     app = TurkceIDE()
     app.mainloop()
