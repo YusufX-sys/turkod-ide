@@ -1,0 +1,76 @@
+{
+  "files": [
+    {
+      "path": "__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size": 0
+    },
+    {
+      "path": "ai.py",
+      "sha256": "b03ac97f28617623914a356463d20dec0355cb467e9686f240ca2a0b0b70b5f1",
+      "size": 3285
+    },
+    {
+      "path": "app.py",
+      "sha256": "2e45fbb54efb912331ca4f4fe58e58c28921fdefbed69de32c4b2f75be912fd4",
+      "size": 226375
+    },
+    {
+      "path": "converter.py",
+      "sha256": "f9964f61e442cc63a80a6596a36beebcd109b76997f1ee83dd1c79e45ff52786",
+      "size": 21517
+    },
+    {
+      "path": "debugger.py",
+      "sha256": "355abafe94cbae7aec63d68da61ee73d4d096b655286a40e1aba9920d4da4b70",
+      "size": 2920
+    },
+    {
+      "path": "dictionary.py",
+      "sha256": "ea050b4aca2ffbb322fc59d599099ff1777e31739d4a17374a665668180ec9b1",
+      "size": 9151
+    },
+    {
+      "path": "paths.py",
+      "sha256": "1acb7c4df400b0710d277a3871fb080ef508dce5e1d7875e8c143d4ebbaa2a32",
+      "size": 888
+    },
+    {
+      "path": "runner.py",
+      "sha256": "376ea94b13c4317822d656436dba905d9e3019ee243b493d3a8afd4192204b54",
+      "size": 1975
+    },
+    {
+      "path": "settings.py",
+      "sha256": "927618019af11e0e1d69816908690db4b9c3c8e4c8170629211f339bc0fecee0",
+      "size": 2164
+    },
+    {
+      "path": "signing.py",
+      "sha256": "33287aa3ceac6ab684483efdf45024f02fcd64ea8813ae6ad51df0b60eab58ce",
+      "size": 4467
+    },
+    {
+      "path": "themes.py",
+      "sha256": "4c3ec10fdab262a610a4da278d3e3e0315f65f7021281e1f5ae761ea3240fb80",
+      "size": 7319
+    },
+    {
+      "path": "turkod.ico",
+      "sha256": "09fc51315bdb44ad5e0825c076c7124b602c4917d6119e466bc8a0b6b719507b",
+      "size": 1846990
+    },
+    {
+      "path": "TurKod_Sozluk.txt",
+      "sha256": "fe09baaf90f01fcadb354dea92e7ac019c447df801c63977ca4caab7d5f7cf65",
+      "size": 113431
+    },
+    {
+      "path": "ui.py",
+      "sha256": "6e2cb081baa5fcbfcc8abcdc0b20307e73ff7f40ec2a9b6523d71c2af617e054",
+      "size": 2742
+    }
+  ],
+  "package": "turkod_ide",
+  "version": "2.1.0"
+}
