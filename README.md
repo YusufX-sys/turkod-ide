@@ -29,7 +29,7 @@ cd "turkod-ide/TürKod v2.1.0 py"
 python "TürKod IDE.py"
 ```
 
-> Not: Gerekli Python sürümü ve bağımlılıklar (varsa `requirements.txt`) bu bölüme eklenmelidir. Şu an README bu bilgiyi içermiyor; kaynaktan çalıştırmayı deneyen biri hangi paketlerin kurulu olması gerektiğini bilemez.
+> Not: Gereksinimler için [requirements](./requirements.txt) dosyasına bakın.
 
 ## 🔗 İlgili Bağlantılar
 
