@@ -30,6 +30,7 @@ python "TürKod IDE.py"
 ```
 
 > Not: Gereksinimler için [requirements](./requirements.txt) dosyasına bakın.
+> Ayrıca sözlükte yer alan kütüphaneleri kullanmak için ayrı şekilde yüklemeniz gereklidir.
 
 ## 🔗 İlgili Bağlantılar
 
