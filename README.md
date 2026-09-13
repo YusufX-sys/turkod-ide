@@ -1,12 +1,15 @@
+<img width="500" height="500" alt="TürKod-Logo" src="https://github.com/user-attachments/assets/853c8706-0b35-461b-82f3-242d1ac541af" />
+
 <img width="692" height="388" alt="TürKod v2 1 0" src="https://github.com/user-attachments/assets/06663826-136b-448e-8b52-8c87ed27f7c5" />
 
-<img width="500" height="500" alt="TürKod-Logo" src="https://github.com/user-attachments/assets/853c8706-0b35-461b-82f3-242d1ac541af" />
 
 # 🇹🇷 TürKod IDE
 
 TürKod IDE, kodlamaya yeni başlayan öğrenciler için tasarlanmış, tamamen Türkçe komutlarla çalışan, sade arayüzlü ve yapay zeka asistanı destekli bir geliştirme ortamıdır.
 
 **Amaç:** Yazılıma yeni başlayan öğrencilerin ve gençlerin kodlama mantığını kendi ana dillerinde kavramalarını kolaylaştırmak. Proje tamamen eğitim odaklıdır.
+
+> Not: Bu proje ile Microsoft Store'da yer alan "Türkod Stüdyosu" uygulaması arasında isim benzerliği dışında herhangi bir bağ bulunmamaktadır.
 
 ## 🚀 Özellikler
 
@@ -28,8 +31,10 @@ git clone https://github.com/YusufX-sys/turkod-ide.git
 cd "turkod-ide/TürKod v2.1.0 py"
 python "TürKod IDE.py"
 ```
+>⚠️ Klasör adındaki Türkçe karakter ve boşluk bazı terminal ortamlarında sorun yaratabilir. Gerekirse klasörü yeniden adlandırın.
 
 > Not: Gereksinimler için [requirements](./requirements.txt) dosyasına bakın.
+
 > Ayrıca sözlükte yer alan kütüphaneleri kullanmak için ayrı şekilde yüklemeniz gereklidir.
 
 ## 🔗 İlgili Bağlantılar
