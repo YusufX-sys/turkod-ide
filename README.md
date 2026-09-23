@@ -1,6 +1,7 @@
 <img width="500" height="500" alt="TürKod-Logo" src="https://github.com/user-attachments/assets/853c8706-0b35-461b-82f3-242d1ac541af" />
 
-<img width="692" height="388" alt="TürKod v2 1 0" src="https://github.com/user-attachments/assets/06663826-136b-448e-8b52-8c87ed27f7c5" />
+<img width="1280" height="720" alt="TürKod (2)" src="https://github.com/user-attachments/assets/68231d30-a562-476e-89f3-4dce788e632c" />
+
 
 
 # 🇹🇷 TürKod IDE
