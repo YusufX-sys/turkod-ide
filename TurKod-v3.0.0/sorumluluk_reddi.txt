@@ -1,0 +1,14 @@
+﻿SORUMLULUK REDDİ
+
+TürKod, eğitim ve deneysel amaçlı, açık kaynaklı bir yazılımdır ve "olduğu gibi" sunulur; herhangi bir garanti verilmez.
+
+Yazılımın kurulumu ve kullanımı kendi sorumluluğunuzdadır. Hukuken izin verilen ölçüde, yazılımın kullanımından doğabilecek veri kaybı, sistem hatası veya güvenlik sorunlarından geliştirici (Yusuf Tandoğan) sorumlu tutulamaz.
+
+Bilmeniz gerekenler:
+- TürKod, yazdığınız kodu ve terminale girdiğiniz komutları bilgisayarınızda çalıştırır. Çalıştırdığınız kodun sonuçlarından siz sorumlusunuz.
+- Yapay zekâ özelliklerini etkinleştirirseniz kodunuz ve sorularınız seçtiğiniz sağlayıcıya (OpenAI, Anthropic, Groq, Google) gönderilir. API anahtarınız bilgisayarınızda ayar dosyasında saklanır.
+- Bu kurulum dosyası dijital olarak imzalı olmayabilir; Windows bu nedenle uyarı gösterebilir.
+
+Lisans detayları için yukarıdaki lisans metnine (MIT) bakın.
+
+© 2026 Yusuf Tandoğan

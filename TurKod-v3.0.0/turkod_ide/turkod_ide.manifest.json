@@ -1,0 +1,110 @@
+{
+  "version": "3.0.0",
+  "files": [
+    {
+      "path": "__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size": 0
+    },
+    {
+      "path": "ai.py",
+      "sha256": "b03ac97f28617623914a356463d20dec0355cb467e9686f240ca2a0b0b70b5f1",
+      "size": 3285
+    },
+    {
+      "path": "ast_katmani.py",
+      "sha256": "dca3e09d5b182ef327830298e2e52cad223eaff1d767351b8803e6198ff9fa97",
+      "size": 12105
+    },
+    {
+      "path": "converter.py",
+      "sha256": "3754a913a9f4e53a677f69ccae9c1545d4da9c67684ad014205dcc0afb277ec9",
+      "size": 27126
+    },
+    {
+      "path": "debugger.py",
+      "sha256": "355abafe94cbae7aec63d68da61ee73d4d096b655286a40e1aba9920d4da4b70",
+      "size": 2920
+    },
+    {
+      "path": "dictionary.py",
+      "sha256": "5162651418a53431f0b522a90ed94dd86b58b14f600468e2f711db7efb81785c",
+      "size": 11286
+    },
+    {
+      "path": "ide_core.py",
+      "sha256": "e3371b1db38dcb1b24ce40a8ac0f4567b2b5fe62eebe4b485dd39c69848d0ca7",
+      "size": 77606
+    },
+    {
+      "path": "ide_core.py.bak-20260920-181029",
+      "sha256": "c47da1620fcb5f0b82ec52ff9f327181b4100f2f9611a92963ae66cc35fb75a7",
+      "size": 77724
+    },
+    {
+      "path": "paths.py",
+      "sha256": "42315ca8e7fddc7682e5ec0e667b6deb5056198abd59c6d5bffcb65d0c51d101",
+      "size": 991
+    },
+    {
+      "path": "pip_tr.py",
+      "sha256": "b6318c03ce8efcc9e1aa7806ce275df2eff711b3f7988a2fba8613ef7267895e",
+      "size": 2711
+    },
+    {
+      "path": "runner.py",
+      "sha256": "8a2523fd624f71b298a4b8731b1b9749eae57657687884360bc48f3459b0d70a",
+      "size": 6567
+    },
+    {
+      "path": "server.py",
+      "sha256": "827dccb56998138ca2c46893717a8029e8719773200d685d80a6bc46ffbab42c",
+      "size": 15128
+    },
+    {
+      "path": "server.py.bak-20260920-181029",
+      "sha256": "594f23c33628c67a94124f781edaae7818daeb11d627f909363db2a10b02c4d0",
+      "size": 14966
+    },
+    {
+      "path": "settings.py",
+      "sha256": "e650ad794d63eae1e7e98d33fdd441af15b075e04d6be0238d9ed0d4815013f3",
+      "size": 2877
+    },
+    {
+      "path": "signing.py",
+      "sha256": "d912d582d1a024284501f27d39d388046e8c44f2ce7509602ae2c72538518e72",
+      "size": 7961
+    },
+    {
+      "path": "themes.py",
+      "sha256": "4c3ec10fdab262a610a4da278d3e3e0315f65f7021281e1f5ae761ea3240fb80",
+      "size": 7319
+    },
+    {
+      "path": "tokenizer.py",
+      "sha256": "6411149c697214fce42836ed7e13289d3908a9933ddbf08a7333013e64b386c1",
+      "size": 6703
+    },
+    {
+      "path": "turkod.ico",
+      "sha256": "09fc51315bdb44ad5e0825c076c7124b602c4917d6119e466bc8a0b6b719507b",
+      "size": 1846990
+    },
+    {
+      "path": "TurKod_Sozluk.txt",
+      "sha256": "2549c3673b23d3a2dfa29a6bd3ba3e7944f0924ee6448ef6c4f3b6dada80168c",
+      "size": 112250
+    },
+    {
+      "path": "ui.py",
+      "sha256": "cd8dfd5bb5bd48f32e620e88c984ae221f2d543cc4ff9f3185152ab95c00b959",
+      "size": 2263
+    },
+    {
+      "path": "updater.py",
+      "sha256": "eb12491eda263b8c98db1b263645d8b42ff77921f14b041b1f20994cfe315174",
+      "size": 7073
+    }
+  ]
+}

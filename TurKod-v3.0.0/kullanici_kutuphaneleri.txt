@@ -1,0 +1,10 @@
+# Kullanıcı programlarının doğrudan çalışması istenen üçüncü parti paketler.
+# Sürümleri sabitle (örn. pygame==2.x.y): temiz makinede aynı sonucu almanın tek yolu bu.
+# converter.MODUL_CEVIRILERI'ndeki torch, tensorflow, django gibi büyük paketleri buraya
+# KOYMA (GB'lar); kullanıcı gerektiğinde python_embed'in pip'i ile kursun.
+pygame
+ursina
+sympy
+# numpy
+# scipy
+# requests

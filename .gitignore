@@ -1,0 +1,36 @@
+# Derleme çıktıları (yeniden üretilir; içindeki .exe/.dll'ler GitHub'ın 100 MB
+# dosya sınırını aşar — dist/ ve build/ ASLA depoya girmemeli)
+dist/
+build/
+.dart_tool/
+ephemeral/
+.flutter-plugins
+.flutter-plugins-dependencies
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# GİZLİ: imzalama anahtarları asla depoya girmemeli
+keys/
+*_private.pem
+
+# yama_uygula.py'nin ve elle alınan yedekler
+*.bak
+*.bak-*
+
+# Derleme sırasında üretilen / yeniden üretilebilen dosyalar
+KURULUM_LISANS.txt
+sihirbaz/*.bmp
+dist_backend/
+
+# IDE / editör klasörleri
+.idea/
+.vscode/
+.kilo/
+*.iml
+
+# Yerel ayarlar / önbellek (makineye özel, kullanıcı verisi)
+.turkod_ayarlar.json
+.turkod_kelimeler.json

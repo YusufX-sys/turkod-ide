@@ -18,33 +18,59 @@ TürKod IDE, kodlamaya yeni başlayan öğrenciler için tasarlanmış, tamamen 
 - **Yapay Zeka Asistanı:** TürKod sözlüğüne erişimi olan, kod yazmaya yardımcı olan dahili asistan.
 - **RSA Dijital İmza Doğrulaması:** Kod ve uygulama bütünlüğü RSA ile imzalanır.
 
-## 📦 Kurulum ve Çalıştırma
-
-### 1. Hazır Çalıştırılabilir Sürüm (.exe)
-
-Python kurmadan çalıştırmak için [Releases](../../releases) sayfasından en son sürümü indirin ve `TürKod IDE.exe` dosyasını çalıştırın.
-
-### 2. Kaynak Koddan Çalıştırma (.py)
-
-```bash
-git clone https://github.com/YusufX-sys/turkod-ide.git
-cd "turkod-ide/TürKod v2.1.0 py"
-python "TürKod IDE.py"
+## 📦 Kurulum
+ 
+En güncel sürümü [Releases](../../releases/latest) sayfasından indirin
+(`TurKod-Setup-X.Y.Z.exe`) ve çalıştırın. Kurulum yönetici izni istemez, tek
+kullanıcı için `%LOCALAPPDATA%` altına kurulur.
+ 
+> Kurulum dosyası şu an ticari bir kod imzalama sertifikasıyla imzalı değildir;
+> Windows SmartScreen bir uyarı gösterebilir. "Ek bilgi" → "Yine de çalıştır"
+> ile devam edebilirsiniz. Dosyanın SHA-256 özeti her sürümün `latest.json`
+> dosyasında yayınlanır.
+ 
+## 👨‍💻 Mimari
+ 
 ```
->⚠️ Klasör adındaki Türkçe karakter ve boşluk bazı terminal ortamlarında sorun yaratabilir. Gerekirse klasörü yeniden adlandırın.
-
-> Not: Gereksinimler için [requirements](./requirements.txt) dosyasına bakın.
-
-> Ayrıca sözlükte yer alan kütüphaneleri kullanmak için ayrı şekilde yüklemeniz gereklidir.
+turkod_flutter/   Windows masaüstü arayüzü (Flutter)
+turkod_ide/       Python arka ucu: çevirici, tokenizer, AST doğrulama,
+                   hata ayıklayıcı, AI entegrasyonu, WebSocket sunucusu
+```
+ 
+Arayüz açılışta arka ucu (`turkod_backend.exe`) kendi alt süreci olarak başlatır
+ve WebSocket üzerinden (`ws://127.0.0.1:<port>/ws`) haberleşir. Arayüz
+kapandığında arka uç ve çalıştırdığı tüm alt süreçler otomatik sonlandırılır.
+ 
+## 🔐 Güvenlik ve bütünlük
+ 
+- Paketlenmiş uygulama, `turkod_ide.manifest.json` içindeki dosya listesi ve
+  SHA-256 özetleriyle kendi bütünlüğünü doğrular; manifest RSA-PSS ile
+  imzalanmıştır (bkz. `turkod_ide/signing.py`).
+- Kaynak kod da aynı yöntemle ayrıca imzalanabilir (bkz. `kaynak_imzala.py`) —
+  bu, deponun belirli bir hâlinin geliştirici tarafından onaylandığını
+  doğrulamak isteyenler içindir.
+- Güncelleme bildirimleri (`latest.json`) de aynı anahtarla imzalanır; uygulama
+  imza geçersizse güncellemeyi reddeder.
+## ℹ Geliştirici için: kaynaktan derleme
+ 
+Gereksinimler: Windows 10/11, Flutter SDK, Python 3.12, PyInstaller, Inno Setup 6,
+Visual Studio (C++ araçları).
+ 
+```powershell
+git clone https://github.com/YusufX-sys/turkod-ide.git
+cd turkod-ide/TurKod-v3.0.0
+powershell -ExecutionPolicy Bypass -File .\hazirla_ve_derle.ps1
+```
+ 
+Betik sırasıyla ortamı denetler, Flutter arayüzünü ve Python arka ucunu derler,
+kullanıcı kodları için ayrı bir Python ortamı hazırlar, paketi imzalar ve
+`dist\TurKod-Setup-X.Y.Z.exe` kurulum dosyasını üretir. Ayrıntılı seçenekler
+için betiğin başındaki açıklamaya bakın.
 
 ## 🔗 İlgili Bağlantılar
 
 - Proje sitesi: https://yusufx-sys.github.io/turkod-site/
 - Site kaynak kodu: https://github.com/YusufX-sys/turkod-site
-
-## 🔐 Güvenlik ve RSA İmza
-
-Bu projedeki çalıştırılabilir ve kaynak kod dosyaları RSA-2048 ile imzalanmıştır. İmza doğrulaması için `build/turkod_public.pem` anahtarı kullanılabilir.
 
 ## Sorumluluk Reddi
 
