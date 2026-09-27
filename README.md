@@ -41,7 +41,11 @@ turkod_ide/       Python arka ucu: çevirici, tokenizer, AST doğrulama,
 Arayüz açılışta arka ucu (`turkod_backend.exe`) kendi alt süreci olarak başlatır
 ve WebSocket üzerinden (`ws://127.0.0.1:<port>/ws`) haberleşir. Arayüz
 kapandığında arka uç ve çalıştırdığı tüm alt süreçler otomatik sonlandırılır.
- 
+
+## 📖 Dokümantasyon
+- [Sözlük](https://yusufx-sys.github.io/turkod-site/learn/sozluk/)
+- [Sözdizimi Davranışları](https://yusufx-sys.github.io/turkod-site/learn/sozdizimi-davranislari/)
+- 
 ## 🔐 Güvenlik ve bütünlük
  
 - Paketlenmiş uygulama, `turkod_ide.manifest.json` içindeki dosya listesi ve
