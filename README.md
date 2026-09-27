@@ -45,7 +45,7 @@ kapandığında arka uç ve çalıştırdığı tüm alt süreçler otomatik son
 ## 📖 Dokümantasyon
 - [Sözlük](https://yusufx-sys.github.io/turkod-site/learn/sozluk/)
 - [Sözdizimi Davranışları](https://yusufx-sys.github.io/turkod-site/learn/sozdizimi-davranislari/)
-- 
+  
 ## 🔐 Güvenlik ve bütünlük
  
 - Paketlenmiş uygulama, `turkod_ide.manifest.json` içindeki dosya listesi ve
