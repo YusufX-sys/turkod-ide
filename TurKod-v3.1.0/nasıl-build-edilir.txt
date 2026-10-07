@@ -1,0 +1,244 @@
+=====================================================================
+  TürKod IDE — Kurulum dosyası (Setup.exe) nasıl üretilir?
+=====================================================================
+
+Bu dosya, kaynak koddan dağıtılabilir "TurKod-Setup-X.Y.Z.exe" kurulum
+dosyasını üretmek için gereken her şeyi ADIM ADIM anlatır. Komutların hepsi
+PowerShell içindir. Aksi yazmadıkça proje kök klasöründe (bu dosyanın
+bulunduğu klasör; surum.txt ve hazirla_ve_derle.ps1 ile aynı yer)
+çalıştırılır. Klasör nerede olursa olsun (Masaüstü, İndirilenler vb.)
+betikler yolları kendi konumlarına göre bulur:
+
+    cd <bu dosyanın bulunduğu klasör>
+
+ÖZET (her şey hazırsa tek komut):
+
+    powershell -ExecutionPolicy Bypass -File .\hazirla_ve_derle.ps1
+
+Çıktı: dist\TurKod-Setup-3.1.0.exe (sürüm surum.txt'den okunur).
+
+
+---------------------------------------------------------------------
+ 1) GEREKLİ PROGRAMLAR (bir kez kurulur)
+---------------------------------------------------------------------
+
+  a) Windows 10 veya 11, 64 bit.
+
+  b) Python 3.12 (64 bit), "Add python.exe to PATH" seçili olarak:
+         https://www.python.org/downloads/windows/
+     Kontrol:
+         python --version
+
+  c) Flutter SDK (stable kanal) + Visual Studio 2022 "Desktop development
+     with C++" iş yükü (Windows masaüstü derlemesi için):
+         https://docs.flutter.dev/get-started/install/windows/desktop
+     Kontrol (Windows satırında yeşil tik olmalı):
+         flutter doctor
+
+  d) Inno Setup 6.6 veya üstü (6.7.1 ile denendi). Açık/koyu temaya uyan
+     sihirbaz tasarımı 6.6+ ister:
+         winget install --id JRSoftware.InnoSetup -e
+     (ya da https://jrsoftware.org/isdl.php ; hazirla_ve_derle.ps1
+     bulamazsa winget ile kurmayı kendisi dener.)
+
+  e) (Yalnızca dağıtım için) Authenticode kod imzalama sertifikası ve
+     Windows SDK içindeki signtool.exe. Deneme derlemesi için GEREKMEZ.
+     Visual Studio Installer > Değiştir > "Windows 11 SDK" bileşeni.
+
+
+---------------------------------------------------------------------
+ 2) BİR KEZ YAPILACAK HAZIRLIK
+---------------------------------------------------------------------
+
+  2.1 Build için gereken Python paketleri
+      (hazirla_ve_derle.ps1 bunu kendisi de yapar):
+
+         python -m pip install --upgrade pip
+         python -m pip install pyinstaller fastapi uvicorn websockets cryptography requests certifi pillow tzdata openai anthropic groq google-genai
+
+  2.2 Kullanıcı programlarını çalıştıracak Python kopyası (python_embed)
+      Kurulumla birlikte gelen, kullanıcıların kodunu çalıştıran TAM bir
+      CPython klasörüdür. Python kurulumundan site-packages HARİÇ kopyalanır
+      (ikinci bir Python yükleyicisi ÇALIŞTIRMA, mevcut kurulumu bozar):
+
+         robocopy "$env:LOCALAPPDATA\Programs\Python\Python312" C:\build\py312 /E /XD site-packages
+         C:\build\py312\python.exe -m ensurepip
+
+      Varsayılan yol C:\build\py312'dir; başka yer kullanırsan aşağıdaki
+      komutlara -PythonKopya <yol> ekle.
+
+  2.3 Manifest imzalama anahtarı (uygulama, kendi dosyalarının bütünlüğünü
+      bu anahtarla doğrular)
+      ZATEN bir anahtarın varsa (ör. C:\gizli\turkod_private.pem) bu adımı
+      ATLA; anahtarı değiştirmek, eski sürümlerin yeni güncellemeleri
+      doğrulayamaması demektir.
+      Yoksa bir kez üret (parola sorar):
+
+         mkdir C:\gizli
+         python manifest_imzala.py --anahtar-uret C:\gizli\turkod
+
+      Oluşan C:\gizli\turkod_public.pem içeriğini
+      turkod_ide\signing.py içindeki TURKOD_PUBLIC_KEY alanına yapıştır.
+      (hazirla_ve_derle.ps1 eşleşmezse bunu senin onayınla kendisi yapar.)
+      _private.pem dosyası GİZLİDİR: depoya koyma, yedeğini al.
+
+      Anahtarın signing.py ile eşleştiğini kontrol et:
+
+         python manifest_imzala.py --anahtar-kontrol C:\gizli\turkod_private.pem
+
+  2.4 Sürüm numarası
+      surum.txt ve turkod_flutter\pubspec.yaml ("version:") AYNI olmalı:
+
+         Get-Content surum.txt
+         Select-String -Path turkod_flutter\pubspec.yaml -Pattern '^version'
+
+
+---------------------------------------------------------------------
+ 3) KURULUM DOSYASINI ÜRETME
+---------------------------------------------------------------------
+
+  3.1 DENEME derlemesi (sertifikasız; kendi bilgisayarında denemek için)
+
+         powershell -ExecutionPolicy Bypass -File .\hazirla_ve_derle.ps1
+
+      Anahtar ya da python kopyası varsayılan yerde değilse:
+
+         powershell -ExecutionPolicy Bypass -File .\hazirla_ve_derle.ps1 `
+             -OzelAnahtar D:\gizli\turkod_private.pem -PythonKopya D:\build\py312
+
+      Bu betik sırasıyla şunları yapar:
+        1. Dosya/sürüm tutarlılığı (surum.txt = pubspec.yaml)
+        2. Build Python paketlerini kurar
+        3. Sunucu dosyasını denetler
+        4. C:\build\py312 kopyasını denetler
+        5. Inno Setup'ı bulur (yoksa kurar)
+        6. Özel anahtarı signing.py ile eşleştirir
+        7. build_release.ps1'i çalıştırır:
+             Flutter release -> PyInstaller (backend) -> python_embed ->
+             paket düzeni -> (Authenticode) -> manifest imzası ->
+             sihirbaz görselleri -> Inno Setup
+        8. Çıkan paketi test eder (backend açılıyor mu, imza doğru mu,
+           kütüphaneler içe aktarılıyor mu)
+
+      Süre: ilk derlemede 10-25 dk (Flutter + PyInstaller). Manifest
+      imzalama artık saniyeler sürer ve sonraki derlemelerde değişmeyen
+      dosyalar için önbellek kullanır.
+
+  3.2 DAĞITIM derlemesi (sertifikayla imzalı + güncelleme bildirimi)
+
+         powershell -ExecutionPolicy Bypass -File .\hazirla_ve_derle.ps1 `
+             -Imzali -SignToolArgs @('/sha1','SERTIFIKA_PARMAK_IZI') `
+             -IndirmeUrl 'https://github.com/YusufX-sys/turkod-ide/releases/download/v3.1.0/TurKod-Setup-3.1.0.exe'
+
+      - SERTIFIKA_PARMAK_IZI: sertifikanın SHA-1 parmak izi
+        (certmgr.msc > Kişisel > Sertifikalar > sertifika > Ayrıntılar).
+      - Azure Trusted/Artifact Signing kullanıyorsan zaman sunucusu:
+             -ZamanSunucu http://timestamp.acs.microsoft.com
+      - -IndirmeUrl verilirse dist\latest.json ve dist\latest.json.sig da
+        üretilir; bunları sürümle birlikte yayınla (uygulama içi güncelleme
+        bildirimi bu dosyaları okur).
+
+  3.3 Yalnızca kurulum dosyasını yeniden üret (dist\TurKod hazırsa)
+      Sihirbaz metni/görseli ya da turkod.iss değiştiyse, Flutter ve
+      PyInstaller'ı yeniden çalıştırmadan:
+
+         powershell -ExecutionPolicy Bypass -File .\hazirla_ve_derle.ps1 -SadeceInno
+
+  3.4 Betikleri tek tek çalıştırmak istersen (ileri düzey)
+
+         # Tam derleme, imzasız:
+         .\build_release.ps1 -PythonKopya C:\build\py312 -OzelAnahtar C:\gizli\turkod_private.pem -ImzasizTest
+
+         # Tam derleme, imzalı:
+         .\build_release.ps1 -PythonKopya C:\build\py312 -OzelAnahtar C:\gizli\turkod_private.pem `
+             -SignToolArgs @('/sha1','SERTIFIKA_PARMAK_IZI') `
+             -VcCrtDizini 'C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Redist\MSVC\14.xx.xxxxx\x64\Microsoft.VC143.CRT'
+
+      Parola her seferinde sorulmasın istersen (yalnızca o oturum için):
+
+         $env:TURKOD_KEY_PASS = 'parolan'
+
+
+---------------------------------------------------------------------
+ 4) ÇIKTILAR
+---------------------------------------------------------------------
+
+  dist\TurKod-Setup-X.Y.Z.exe   Dağıtılacak kurulum dosyası
+  dist\TurKod\                  Kurulumun içeriği (doğrudan da çalışır:
+                                dist\TurKod\turkod_flutter.exe)
+  dist\TurKod\backend\turkod_ide.manifest.json(.sig)
+                                Dosya bütünlüğü manifesti ve imzası
+  dist\latest.json(.sig)        Güncelleme bildirimi (-IndirmeUrl ile)
+  dist\iscc.log                 Inno Setup derleme günlüğü
+  build\manifest_onbellek.json  İmzalama hash önbelleği (pakete girmez)
+
+
+---------------------------------------------------------------------
+ 5) KONTROL VE DOĞRULAMA
+---------------------------------------------------------------------
+
+  Paketin manifest imzası ve dosyaları doğru mu (anahtar gerekmez,
+  uygulamanın kullandığı kuralla aynı):
+
+         python manifest_imzala.py --dogrula dist\TurKod\backend
+
+  Manifest imzalamayı elle çalıştırmak (Authenticode imzasından SONRA):
+
+         python manifest_imzala.py --dizin dist\TurKod\backend --surum 3.1.0 `
+             --ozel-anahtar C:\gizli\turkod_private.pem --haric "_internal/python_embed/*"
+
+         --tam   önbelleği yok sayıp her şeyi yeniden hash'ler
+         --kuru  hiçbir şey yazmadan yalnızca tarar/süre ölçer
+
+  Kurulum dosyasının Authenticode imzası (imzalı derlemede):
+
+         signtool verify /pa /all dist\TurKod-Setup-3.1.0.exe
+
+  Önerilen son kontrol: Setup dosyasını temiz bir Windows sanal
+  makinesinde kur; editörü, kod çalıştırmayı, kaplumbağa ve pygame
+  örneklerini dene.
+
+
+---------------------------------------------------------------------
+ 6) KURULUM SİHİRBAZI GÖRÜNÜMÜ
+---------------------------------------------------------------------
+
+  Sihirbaz, projenin sitesiyle (https://yusufx-sys.github.io/turkod-site/)
+  aynı tasarımı kullanır ve Windows'un açık/koyu temasına kendiliğinden
+  uyar. Görseller her derlemede otomatik üretilir; elle üretmek için:
+
+         python sihirbaz_gorsel_uret.py
+
+  Çıktı sihirbaz\ klasörüne PNG olarak yazılır (arka*.png, sihirbaz*.png,
+  logo*.png). Renkler ve yazılar sihirbaz_gorsel_uret.py dosyasının
+  başındaki ayarlardan değiştirilir; sihirbaz metinleri turkod.iss içindeki
+  [Messages] bölümündedir.
+
+
+---------------------------------------------------------------------
+ 7) SIK KARŞILAŞILAN SORUNLAR
+---------------------------------------------------------------------
+
+  * "running scripts is disabled": komutun başına
+        powershell -ExecutionPolicy Bypass -File
+    ekleyerek çalıştır (yukarıdaki örneklerdeki gibi).
+
+  * "flutter/pyinstaller/python bulunamadı": PATH'e eklenmemiş. Yeni bir
+    PowerShell penceresi aç; olmazsa programı PATH seçeneğiyle yeniden kur.
+
+  * "Bu özel anahtar signing.py'deki public key'in eşi değil": yanlış
+    .pem dosyası. Doğru anahtarı -OzelAnahtar ile ver (bkz. 2.3).
+
+  * "Inno Setup bulunamadı": bkz. 1.d.
+
+  * "Resource update error: File is too large" (ikon): build_release.ps1
+    bunu küçük bir ikonla kendisi düzeltir; olmazsa ikonsuz derler.
+
+  * "python_embed kendi kendine yetmiyor": C:\build\py312 kopyası eksik ya
+    da bozuk. Klasörü silip 2.2'yi yeniden uygula.
+
+  * Yönetici PowerShell'i KULLANMA; PyInstaller yönetici olarak
+    çalıştırılmayı istemez.
+
+  * Derleme bir adımda durursa, ekrandaki "=== n/8" satırı hangi adımda
+    durduğunu gösterir; hata mesajıyla birlikte o adımı yeniden dene.

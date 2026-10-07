@@ -1,0 +1,3 @@
+# turkod_ide imzalı (turkod_ide.manifest.json): Git satır sonlarını değiştirirse
+# (core.autocrlf) dosya hash'leri manifestle tutmaz. Dosyalar olduğu gibi saklanır.
+turkod_ide/** -text
