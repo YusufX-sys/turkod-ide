@@ -44,8 +44,8 @@ ve WebSocket üzerinden (`ws://127.0.0.1:<port>/ws`) haberleşir. Arayüz
 kapandığında arka uç ve çalıştırdığı tüm alt süreçler otomatik sonlandırılır.
 
 ## 📖 Dokümantasyon
-- [Sözlük](https://yusufx-sys.github.io/turkod-site/learn/sozluk/)
-- [Sözdizimi Davranışları](https://yusufx-sys.github.io/turkod-site/learn/sozdizimi-davranislari/)
+- [Sözlük](https://turkod.pages.dev/learn/sozluk/)
+- [Sözdizimi Davranışları](https://turkod.pages.dev/learn/sozdizimi-davranislari/)
   
 ## 🔐 Güvenlik ve bütünlük
  
@@ -75,7 +75,7 @@ için betiğin başındaki açıklamaya bakın.
 
 ## 🔗 İlgili Bağlantılar
 
-- Proje sitesi: https://yusufx-sys.github.io/turkod-site/
+- Proje sitesi: https://turkod.pages.dev/
 - Site kaynak kodu: https://github.com/YusufX-sys/turkod-site
 
 ## Sorumluluk Reddi
