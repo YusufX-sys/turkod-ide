@@ -64,7 +64,7 @@ Visual Studio (C++ araçları).
  
 ```powershell
 git clone https://github.com/YusufX-sys/turkod-ide.git
-cd turkod-ide/TurKod-v3.1.0
+cd turkod-ide/TurKod-v3.2.0
 powershell -ExecutionPolicy Bypass -File .\hazirla_ve_derle.ps1
 ```
  
