@@ -1,0 +1,135 @@
+{
+  "version": "3.2.0",
+  "files": [
+    {
+      "path": "__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size": 0
+    },
+    {
+      "path": "ai.py",
+      "sha256": "09d14b3844111458b633b2981e985b0de73013ad8768e5a4106188d0f37b6bde",
+      "size": 4887
+    },
+    {
+      "path": "akilli_duzeltici.py",
+      "sha256": "2617b2f1f584510147bbf961f48abbf71df1f20f6c4a19e08de643fdd91e5703",
+      "size": 141099
+    },
+    {
+      "path": "ast_katmani.py",
+      "sha256": "f109d6a861b40e6509c5842cad10c0be3cf7a2d0530b8207efa7103cccd2bf83",
+      "size": 15907
+    },
+    {
+      "path": "calistirici.py",
+      "sha256": "8c1fb18559876e859a1e4b9c15cef6854516fbe86dbe27918f86992babe6a137",
+      "size": 43878
+    },
+    {
+      "path": "cikti_cevirici.py",
+      "sha256": "b69561ebdb98295dfc219e79e9c6837571062e6d15c27b58f093d7af35a7e4dc",
+      "size": 17659
+    },
+    {
+      "path": "converter.py",
+      "sha256": "210562b2e95f4158912937927b82cbe5140e17613851b9aca65b621a6ac41774",
+      "size": 97434
+    },
+    {
+      "path": "debugger.py",
+      "sha256": "8fc648b76863feb59e2e5d0e31c879ad41458fb055d7f60dad4b7d56ba3d7800",
+      "size": 26821
+    },
+    {
+      "path": "dictionary.py",
+      "sha256": "59978af47c520f129ec225cf288fbdc52621671770a75dad503f68cc711ef47d",
+      "size": 45917
+    },
+    {
+      "path": "editor-logo.ico",
+      "sha256": "5707dfabd9c5fefad13f7c72b236e64fc9a7ee452dc8ecb19fe5a2b13536d96a",
+      "size": 406134
+    },
+    {
+      "path": "entegrasyon.py",
+      "sha256": "07917925b94885236aa0b812bbc2aff5e2795526487b3d5d5856d26fd47d3927",
+      "size": 9668
+    },
+    {
+      "path": "ide_core.py",
+      "sha256": "ba985a481513c68235cdfe83c36d30e4657a9bd889d7d6757607abbefad6d1f5",
+      "size": 139399
+    },
+    {
+      "path": "paths.py",
+      "sha256": "ae057994f237121a93f8797a00394746185e17b1a34a2971f38a8a3f682c9639",
+      "size": 1673
+    },
+    {
+      "path": "pip_tr.py",
+      "sha256": "0cbbf81e9edc5c06e066bab8894ca8d3e1f14b80639ae64064b33da46af1b612",
+      "size": 7871
+    },
+    {
+      "path": "runner.py",
+      "sha256": "3b88c3faf7d148c0ddabb2355987f9faa15c6f433bbb99a26c45570553a496ab",
+      "size": 20110
+    },
+    {
+      "path": "server.py",
+      "sha256": "d63bf868f16480447f4e2698a6ddfad375d059fb9c1ac4ee46daf9019b676e5b",
+      "size": 23261
+    },
+    {
+      "path": "settings.py",
+      "sha256": "a3daae15d18b683770d55b36c346063c5110dd4eb78995b7e80698ecddbb80a6",
+      "size": 6002
+    },
+    {
+      "path": "signing.py",
+      "sha256": "22a29dc60cfee63b99cf3acf001307687af30d3478b644c574a2852afd8eb522",
+      "size": 11462
+    },
+    {
+      "path": "surec_izleyici.py",
+      "sha256": "00f976a866df336e015fe6b92adb9ccb625b92fcc1fa74b1334f212e67cd3c1a",
+      "size": 2289
+    },
+    {
+      "path": "tablo_tutarlilik.py",
+      "sha256": "690083df981eb6abf128e211beef9a9a81d8d34149912ace31663803fb65326e",
+      "size": 8546
+    },
+    {
+      "path": "themes.py",
+      "sha256": "0ed5ff7dafe528f167f5ea443324dffa7b28c705b0471c487e2729eb7b512fa8",
+      "size": 7189
+    },
+    {
+      "path": "tokenizer.py",
+      "sha256": "e2661a8a6523c6fc1decbc3d0c1916fa5860d4c925c58e5593b28c2c3bf7aeb7",
+      "size": 7325
+    },
+    {
+      "path": "turkod.ico",
+      "sha256": "09fc51315bdb44ad5e0825c076c7124b602c4917d6119e466bc8a0b6b719507b",
+      "size": 1846990
+    },
+    {
+      "path": "TurKod_Sozluk.txt",
+      "sha256": "83c1311f165fe10f1cb58e97af5e045adb59aecc5e0df380a5fa2409f67478aa",
+      "size": 106177
+    },
+    {
+      "path": "ui.py",
+      "sha256": "20f6e56dfe2023563a698ffd350dd35a6e8177809bd31cd1e24465ab1184b38c",
+      "size": 2193
+    },
+    {
+      "path": "updater.py",
+      "sha256": "ca9ae8af9745587f9d6b678c2a3291576aef12b5ca6d9863a3e92eb5bd021090",
+      "size": 10163
+    }
+  ]
+}
