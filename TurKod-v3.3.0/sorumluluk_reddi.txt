@@ -1,0 +1,15 @@
+﻿SORUMLULUK REDDİ
+
+TürKod, eğitim ve deneysel amaçlı, açık kaynaklı bir yazılımdır ve "olduğu gibi" sunulur; herhangi bir garanti verilmez.
+
+Yazılımın kurulumu ve kullanımı kendi sorumluluğunuzdadır. Hukuken izin verilen ölçüde, yazılımın kullanımından doğabilecek veri kaybı, sistem hatası veya güvenlik sorunlarından geliştirici (Yusuf Tandoğan) sorumlu tutulamaz.
+
+Bilmeniz gerekenler:
+- TürKod, yazdığınız kodu ve terminale girdiğiniz komutları bilgisayarınızda çalıştırır. Çalıştırdığınız kodun sonuçlarından siz sorumlusunuz.
+- Yapay zekâ özelliklerini bir bulut sağlayıcısıyla kullanırsanız (OpenAI, Anthropic, Groq, Google ve Ayarlar'da bağladığınız diğer sağlayıcılar ya da özel adres) kodunuz ve sorularınız o sağlayıcıya gönderilir. API anahtarlarınız bilgisayarınızdaki ayar dosyasında, Windows şifrelemesiyle saklanır. Bilgisayarınızda çalışan yerel modellerde (Yerel AI Modelleri) hiçbir veri dışarı gönderilmez.
+- Kodi'de "Mesajla birlikte görüntü gönder" ayarını açarsanız, Kodi'ye yazdığınız her mesajla TürKod penceresinin ya da bütün ekranın görüntüsü de seçili yapay zekâ sağlayıcısına gönderilir (ayar varsayılan olarak kapalıdır). Kodi'nin sohbetleri ve hatırladığı notlar yalnızca bilgisayarınızda (kullanıcı klasörü\.turkod) saklanır. IDE içindeki tarayıcı sayfaları Microsoft Edge WebView2 ile açar; ziyaret ettiğiniz siteler kendi gizlilik kurallarına tabidir.
+- Bu kurulum dosyası dijital olarak imzalı olmayabilir; Windows bu nedenle uyarı gösterebilir.
+
+Lisans detayları için yukarıdaki lisans metnine (MIT) bakın.
+
+© 2026 Yusuf Tandoğan

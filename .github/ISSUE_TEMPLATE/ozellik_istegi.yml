@@ -1,0 +1,22 @@
+name: ✨ Özellik isteği
+description: TürKod'a yeni bir özellik öner
+labels: ["öneri"]
+body:
+  - type: textarea
+    id: sorun
+    attributes:
+      label: Hangi ihtiyacı karşılayacak?
+      description: Bu özellik olmadan ne zorluk yaşıyorsun?
+    validations:
+      required: true
+  - type: textarea
+    id: oneri
+    attributes:
+      label: Önerin
+      description: Nasıl çalışmasını hayal ediyorsun?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatif
+    attributes:
+      label: Düşündüğün başka yollar

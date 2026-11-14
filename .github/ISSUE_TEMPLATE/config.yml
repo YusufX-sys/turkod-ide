@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 🔐 Güvenlik açığı bildir
+    url: https://github.com/YusufX-sys/turkod-ide/security/advisories/new
+    about: Güvenlik açıklarını gizli olarak bildir.
+  - name: 📖 Belgeler ve sözlük
+    url: https://turkod.pages.dev/
+    about: Kurulum, kullanım ve TürKod sözlüğü.

@@ -34,3 +34,25 @@ dist_backend/
 # Yerel ayarlar / önbellek (makineye özel, kullanıcı verisi)
 .turkod_ayarlar.json
 .turkod_kelimeler.json
+
+# Elle alınmış proje yedekleri (depoya girmemeli)
+TurKod-yedek-*/
+*-yedek/
+yedek/
+
+# Yerel geliştirme / asistan notları (makineye özel yollar içerir)
+CLAUDE.md
+AGENTS.md
+.claude/
+
+# Günlükler ve geçici dosyalar
+*.log
+x_test_*.txt
+*.tmp
+*.orig
+*.rej
+
+# İşletim sistemi dosyaları
+Thumbs.db
+desktop.ini
+.DS_Store

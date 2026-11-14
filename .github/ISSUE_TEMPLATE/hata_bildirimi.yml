@@ -1,0 +1,43 @@
+name: 🐞 Hata bildirimi
+description: TürKod'da beklendiği gibi çalışmayan bir şey bildir
+labels: ["hata"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Bildirimin için teşekkürler! Güvenlik açıklarını burada değil, SECURITY.md'deki yoldan bildir.
+  - type: input
+    id: surum
+    attributes:
+      label: TürKod sürümü
+      description: Yardım → Hakkında penceresinde yazar.
+      placeholder: "3.3.0"
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows sürümü
+      placeholder: "Windows 11 23H2"
+  - type: textarea
+    id: ne_oldu
+    attributes:
+      label: Ne oldu?
+      description: Hatayı kısaca anlat. Hata mesajı varsa olduğu gibi yapıştır.
+    validations:
+      required: true
+  - type: textarea
+    id: adimlar
+    attributes:
+      label: Nasıl tekrarlanır?
+      description: Adım adım yaz. Hatayı üreten küçük bir TürKod kodu çok işe yarar.
+    validations:
+      required: true
+  - type: textarea
+    id: beklenen
+    attributes:
+      label: Ne olmasını bekliyordun?
+  - type: textarea
+    id: ekler
+    attributes:
+      label: Ekran görüntüsü / ek bilgi

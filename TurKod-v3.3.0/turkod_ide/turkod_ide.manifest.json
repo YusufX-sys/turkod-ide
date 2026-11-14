@@ -1,0 +1,240 @@
+{
+  "version": "3.3.0",
+  "files": [
+    {
+      "path": "__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size": 0
+    },
+    {
+      "path": "ai.py",
+      "sha256": "8b8438fdeb6cc7f81613ff4dabf9e53ac0ae98fe2e3b582ab35a1670e20ef003",
+      "size": 50876
+    },
+    {
+      "path": "akilli_duzeltici.py",
+      "sha256": "75b80bc3ae336e7346e6301f32681dccb12252d1ab8d3b653884e9141a38d915",
+      "size": 157835
+    },
+    {
+      "path": "ast_katmani.py",
+      "sha256": "7b9940759f430cb52e3bb157671bd1efd43323a8b2064c84a15397518a69628b",
+      "size": 19264
+    },
+    {
+      "path": "calistirici.py",
+      "sha256": "72957b2068df1f2425ab87be667a1f59ef2f7dafd22fff2af3a877598144624e",
+      "size": 56998
+    },
+    {
+      "path": "cikti_cevirici.py",
+      "sha256": "9b82af808b62428460e864932a40b30645be3b935bd89239486ec22111df14d5",
+      "size": 31993
+    },
+    {
+      "path": "converter.py",
+      "sha256": "d21280dde1a982fd75651a9ad1f78eb93e1b43fe3c90c0048a77b954c12240ac",
+      "size": 149444
+    },
+    {
+      "path": "debugger.py",
+      "sha256": "a3b4950d818baad1373e3c693135f0bdf09973098194bf53953e7b3e6ba5817e",
+      "size": 30455
+    },
+    {
+      "path": "deger_sozlugu.py",
+      "sha256": "8c612e2f5452b566bbf3f968d5b826a5f02dcabf40dc61c907384dcf9a9a060d",
+      "size": 12525
+    },
+    {
+      "path": "dictionary.py",
+      "sha256": "e7076017a69edd57042d9c1b265c3a8b54608812ef0a28fbbd53e53e0811ebcc",
+      "size": 61803
+    },
+    {
+      "path": "editor-logo.ico",
+      "sha256": "ede1191ad2784ee5ebc6538241800156b0e5d9e846b231ab1a6b59a1ec4d9b06",
+      "size": 84040
+    },
+    {
+      "path": "entegrasyon.py",
+      "sha256": "07917925b94885236aa0b812bbc2aff5e2795526487b3d5d5856d26fd47d3927",
+      "size": 9668
+    },
+    {
+      "path": "exe_donusturucu.py",
+      "sha256": "27f9eb20ee619bb9887d7f4811a083de84b81cd4e108f4d14bd3b8e54e79fcee",
+      "size": 53036
+    },
+    {
+      "path": "exe_terminali.py",
+      "sha256": "691ac2ed00016b35f2a55f80eb887aaa12846d0108213b180e2f64a87f6576ba",
+      "size": 23590
+    },
+    {
+      "path": "hayalet_tamamlama.py",
+      "sha256": "13ee8c95668cdd1fc02e282df2851bcfde9688c688fa482fde0aaadf9d2d3950",
+      "size": 19501
+    },
+    {
+      "path": "ide_core.py",
+      "sha256": "845e4023d26808d23f4c263b3b128232e8dda354285ff712fc40a39a0662dada",
+      "size": 277864
+    },
+    {
+      "path": "kabuk.py",
+      "sha256": "f7b0d86084db6649e1434622e68e6f23315b5283058b2bb0e1d0eeef3f8f3745",
+      "size": 28575
+    },
+    {
+      "path": "kod_araclari.py",
+      "sha256": "41c36bb64be3e22817fd3ec789bbb6407ea03a97b0adf961504bae271b007fb8",
+      "size": 22504
+    },
+    {
+      "path": "kodi.py",
+      "sha256": "7b32d30a259b13fa39b6d6d23645c009b8004c506f4021f94b9ce25270f4664e",
+      "size": 51642
+    },
+    {
+      "path": "kodi_goruntu.py",
+      "sha256": "e65d4d646c51b9c2eada04f7dfdcf10da35ef3b4b83d68ebab46521e3539c4e6",
+      "size": 2335
+    },
+    {
+      "path": "kodi_hafiza.py",
+      "sha256": "c7ced16faa276819f4a43e1bae9c2e8e5be387fa63393321433980db5df53e74",
+      "size": 13226
+    },
+    {
+      "path": "kodi_kilavuz.py",
+      "sha256": "07f51a1c8dee330f342b2a006eb5294585fc9962909439c93ae139ce8b284dec",
+      "size": 78807
+    },
+    {
+      "path": "kodi_ses.ps1",
+      "sha256": "4241ebdb401e036ae52f9d6fbc83c3aabe765c83c3446a99f42beed33caee654",
+      "size": 1649
+    },
+    {
+      "path": "kodi_ses.py",
+      "sha256": "afa1dcef03beae392b2958755c3fd0336817341a4193608762b1ecd10f5cbba7",
+      "size": 9245
+    },
+    {
+      "path": "kodi_yerel.py",
+      "sha256": "55d8c563d7fec7b251db54fed674449bd907c48b22214416e8668d2bc51ee8f4",
+      "size": 17265
+    },
+    {
+      "path": "logo_ascii.py",
+      "sha256": "8f7774bb10c1d89a60efccd779c7db768be564bbbba38b0d88c4ce8269cb3a1b",
+      "size": 3627
+    },
+    {
+      "path": "logo_verisi.py",
+      "sha256": "534c71c4e3888f3c7d548ace40a289a7e01de7021b36a33608a123d315e1dd37",
+      "size": 38911
+    },
+    {
+      "path": "modul_sozlugu.py",
+      "sha256": "37e41f15e8070266ff7ae7b1c06553531f52c967dc78b41347c3aa2b45c76def",
+      "size": 1384626
+    },
+    {
+      "path": "paths.py",
+      "sha256": "ae057994f237121a93f8797a00394746185e17b1a34a2971f38a8a3f682c9639",
+      "size": 1673
+    },
+    {
+      "path": "pip_tr.py",
+      "sha256": "0cbbf81e9edc5c06e066bab8894ca8d3e1f14b80639ae64064b33da46af1b612",
+      "size": 7871
+    },
+    {
+      "path": "program-logo.ico",
+      "sha256": "a609afd0d494d05070bad26845dc791012f34a9f6392dbe8fa7cec3c11f19991",
+      "size": 57902
+    },
+    {
+      "path": "program-logo.png",
+      "sha256": "c87beba2183e3be1ed2f406e7c1c36589e9465fae79adc59f2001a46c0952646",
+      "size": 4927
+    },
+    {
+      "path": "runner.py",
+      "sha256": "13c191789c45b0c21abf995cb620a740132c975ddc681f9defa4eae6999d932d",
+      "size": 76769
+    },
+    {
+      "path": "server.py",
+      "sha256": "1aa9b8afddf4a823e6568c38860bb585e66566702e7e46a1f71281e8624968fe",
+      "size": 32489
+    },
+    {
+      "path": "settings.py",
+      "sha256": "8fc66bd74f26a6c5686abc5464aa6174a626352290b1e5dfdb65fd4c5e9cf883",
+      "size": 12232
+    },
+    {
+      "path": "signing.py",
+      "sha256": "22a29dc60cfee63b99cf3acf001307687af30d3478b644c574a2852afd8eb522",
+      "size": 11462
+    },
+    {
+      "path": "surec_izleyici.py",
+      "sha256": "00f976a866df336e015fe6b92adb9ccb625b92fcc1fa74b1334f212e67cd3c1a",
+      "size": 2289
+    },
+    {
+      "path": "tablo_tutarlilik.py",
+      "sha256": "690083df981eb6abf128e211beef9a9a81d8d34149912ace31663803fb65326e",
+      "size": 8546
+    },
+    {
+      "path": "terminal-logo.ico",
+      "sha256": "f74f8418701f0cb25227cc3fc44b49b54b7dc203bfdf0d9fa2410dfd3c088738",
+      "size": 44978
+    },
+    {
+      "path": "themes.py",
+      "sha256": "0ed5ff7dafe528f167f5ea443324dffa7b28c705b0471c487e2729eb7b512fa8",
+      "size": 7189
+    },
+    {
+      "path": "tokenizer.py",
+      "sha256": "e2661a8a6523c6fc1decbc3d0c1916fa5860d4c925c58e5593b28c2c3bf7aeb7",
+      "size": 7325
+    },
+    {
+      "path": "turkod.ico",
+      "sha256": "09fc51315bdb44ad5e0825c076c7124b602c4917d6119e466bc8a0b6b719507b",
+      "size": 1846990
+    },
+    {
+      "path": "TurKod_Sozluk.txt",
+      "sha256": "36b744296b23cc52827da30c16fef78959b559c510da0061efc2d304ff3e9d33",
+      "size": 123494
+    },
+    {
+      "path": "ui.py",
+      "sha256": "20f6e56dfe2023563a698ffd350dd35a6e8177809bd31cd1e24465ab1184b38c",
+      "size": 2193
+    },
+    {
+      "path": "updater.py",
+      "sha256": "ca9ae8af9745587f9d6b678c2a3291576aef12b5ca6d9863a3e92eb5bd021090",
+      "size": 10163
+    },
+    {
+      "path": "yerel_modeller.py",
+      "sha256": "51d72076010c4597c288be4ba4de51e127f161659f3ff1aff2e49cc67a0caf5b",
+      "size": 61583
+    },
+    {
+      "path": "yerel_sunucu.py",
+      "sha256": "e4d988f6ece8e9309a73ebe9bb9ce837073c14144440da7706e30338461d7edd",
+      "size": 14273
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+name: 📚 Sözlük önerisi
+description: Eksik, yanlış ya da daha iyi olabilecek bir Türkçe karşılık öner
+labels: ["sözlük"]
+body:
+  - type: input
+    id: python
+    attributes:
+      label: Python karşılığı
+      placeholder: "turtle.done"
+    validations:
+      required: true
+  - type: input
+    id: mevcut
+    attributes:
+      label: Şu anki TürKod karşılığı (varsa)
+      placeholder: "kaplumbağa.çıkışta_bekle"
+  - type: input
+    id: onerilen
+    attributes:
+      label: Önerdiğin TürKod karşılığı
+      placeholder: "kaplumbağa.tamamla"
+    validations:
+      required: true
+  - type: textarea
+    id: neden
+    attributes:
+      label: Neden daha iyi?
+      description: Çocukların anlayacağı, doğal Türkçe olması önemli.
